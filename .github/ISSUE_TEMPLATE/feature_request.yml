@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest a change or an addition.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read "Rules a change must keep" in CONTRIBUTING.md first. A proposal that adds a network path between the scanner and the brain, sends scan data to a new party, or adds a dependency needs a reason in the request.
+
+        Do not paste scan results, host names, addresses, tokens, or keys from a real install.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do, and why the current behavior does not cover it.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: The proposed change
+      description: What Momus should do instead. If it changes what is sent to a third party, or what the scanner may scan, say so.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+    validations:
+      required: false

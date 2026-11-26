@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% set fx = d.finding %}
+{% from "_pager.html" import pager %}
+{% block title %}Finding{% endblock %}
+{% block body %}
+<p><a href="/findings">Findings</a></p>
+<h1>{{ fx.title or fx.check_id or fx.finding_key }}</h1>
+{% include "_flash.html" %}
+<p><span class="band b-{{ (fx.band or 'none')|lower }}">{{ fx.band or "-" }}</span>
+  <code>{{ fx.hostname }}{% if fx.port %}:{{ fx.port }}{% endif %}</code> · {{ fx.source }} · <code>{{ fx.check_id }}</code> · status {{ fx.status }}{% if fx.state %} ({{ fx.state }}){% endif %}</p>
+<dl class="facts">
+  <dt>Verdict</dt><dd>{{ fx.verdict or "not verified" }}{% if d.verification %}: {{ d.verification }}{% endif %}</dd>
+  <dt>Exposure class</dt><dd>{{ fx.exposure or "-" }}</dd>
+  <dt>Asset class</dt><dd>{{ fx.asset_class or "-" }}</dd>
+  <dt>First seen</dt><dd><code>{{ fx.first_seen_run }}</code></dd>
+  <dt>Last seen</dt><dd><code>{{ fx.last_seen_run }}</code>{% if fx.fixed_run %}; fixed in <code>{{ fx.fixed_run }}</code>{% endif %}</dd>
+  <dt>Matched</dt><dd><code>{{ d.matched or "-" }}</code></dd>
+  <dt>CVEs</dt><dd>{{ fx.cve_ids or "-" }}</dd>
+</dl>
+
+<section class="card">
+<h2>Mark</h2>
+{% if d.mark %}
+  <p><strong>{{ kinds[d.mark.kind] }}</strong> by {{ d.mark.created_by }}, {{ d.mark.created_at|t }}. Reason ({{ d.mark.reason_source }}): {{ d.mark.reason }}</p>
+  {% if d.mark.stale %}<p class="flash err">This mark is stale: {{ d.mark.stale_why }}. The finding is listed again until someone looks at it.</p>{% endif %}
+  <form method="post" action="/findings/{{ fx.finding_key|urlencode }}/unmark" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary">Withdraw the mark</button></form>
+{% endif %}
+<form method="post" action="/findings/{{ fx.finding_key|urlencode }}/mark" class="stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="evidence_fp" value="{{ d.evidence_fp }}">
+  <label>Mark as <select name="kind">{% for k, l in kinds.items() %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></label>
+  <label>Reason <textarea name="reason" required minlength="3" maxlength="2000" rows="2"></textarea></label>
+  <button>{{ "Replace the mark" if d.mark else "Save the mark" }}</button>
+</form>
+<p class="note">A mark never changes the score, verdict or status. It is tied to the evidence as it is now: if the finding reopens or its evidence changes, the mark becomes stale.</p>
+</section>
+
+<section><h2>Description</h2><p class="pre">{{ d.description or "-" }}</p></section>
+<section><h2>Remediation</h2><p class="pre">{{ d.remediation or "-" }}</p></section>
+<section>
+<h2>Score</h2>
+<dl class="facts">
+  {% for k, l in [("score","Score"),("impact","Impact"),("likelihood","Likelihood"),("cvss","CVSS"),("epss","EPSS"),("kev","In KEV"),("sla_days","Fix within (days)")] %}
+  <dt>{{ l }}</dt><dd>{{ d.score[k]|n }}</dd>
+  {% endfor %}
+</dl>
+</section>
+{% if d.triage %}
+<section>
+<h2>What it exposes (triage)</h2>
+<p class="pre">{{ d.triage.summary or "-" }}</p>
+{% if d.triage.fix %}<p class="pre">{{ d.triage.fix }}</p>{% endif %}
+{% if d.triage.secrets %}<table><thead><tr><th>Secret type</th><th>Masked</th><th>Where</th><th>Line</th></tr></thead><tbody>
+{% for s in d.triage.secrets %}<tr><td>{{ s.type }}</td><td><code>{{ s.masked or "-" }}</code></td><td><code>{{ s.where }}</code></td><td>{{ s.line|n }}</td></tr>{% endfor %}
+</tbody></table>{% endif %}
+{% if d.triage.exposed %}<ul>{% for i in d.triage.exposed %}<li><code>{{ i }}</code></li>{% endfor %}</ul>{% endif %}
+</section>
+{% endif %}
+<section>
+<h2>Stored evidence</h2>
+<p class="note">As stored by the scanner after minimization and redaction. Text from the target is shown as text; links are not followed.</p>
+<pre>{{ d.evidence_text or "-" }}</pre>
+{% if d.references %}<h3>References</h3><ul>{% for r in d.references %}<li><code>{{ r }}</code></li>{% endfor %}</ul>{% endif %}
+{% if d.tags %}<p>Tags: {% for t in d.tags %}<span class="tag">{{ t }}</span> {% endfor %}</p>{% endif %}
+</section>
+<section>
+<h2>History across runs</h2>
+<p class="note">Newest first.</p>
+<div class="scroll"><table><thead><tr><th>Run</th><th>Kind</th><th>Started</th><th>State</th><th>Band</th><th>Score</th><th>Verdict</th></tr></thead><tbody>
+{% for h in d.history %}<tr><td><code>{{ h.run_id }}</code></td><td>{{ h.kind or "-" }}</td><td>{{ h.started|t }}</td><td>{{ h.state }}</td><td>{{ h.band }}</td><td>{{ h.score|n }}</td><td>{{ h.verdict or "-" }}</td></tr>{% endfor %}
+</tbody></table></div>
+{{ pager("hist_page", d.history_page, d.history_more) }}
+</section>
+{% if d.mark_history %}
+<section><h2>Marks</h2><ul>{% for m in d.mark_history %}<li>{{ kinds[m.kind] }} by {{ m.created_by }} ({{ m.created_at|t }}). Reason ({{ m.reason_source }}): {{ m.reason }}{% if m.withdrawn_at %} — withdrawn {{ m.withdrawn_at|t }} by {{ m.withdrawn_by }}{% endif %}</li>{% endfor %}</ul></section>
+{% endif %}
+{% endblock %}

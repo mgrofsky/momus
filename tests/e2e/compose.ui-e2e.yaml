@@ -1,0 +1,7 @@
+# Used only by tests/e2e/run_demo_ui.sh, on top of compose.yaml and compose.lab.yaml: the lab brain's mock provider
+# records every prompt it is sent (it sends nothing anywhere) to its own tmpfs, so the test can check that no canary
+# secret would have reached a model provider. Never part of an ordinary lab run.
+services:
+  brain:
+    environment:
+      MOMUS_ANALYST_MOCK_RECORD: /tmp/analyst-prompts.jsonl

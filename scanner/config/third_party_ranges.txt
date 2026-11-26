@@ -1,0 +1,5 @@
+# Broad, published provider address ranges. A host whose address lands here is classed third_party (passive
+# checks, HTTP fingerprint, takeover/misconfig templates, no port scan) even without a telling CNAME.
+# Your own scope/third_party_ranges.txt is merged with this list. One CIDR per line, # comments, e.g.
+#   <provider CIDR>      # provider
+# Shipped empty for now: add the published ranges of the mail, marketing and hosting providers you use.

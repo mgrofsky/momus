@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_analyst_refs.html" import refs %}
+{% block title %}Proposal {{ d.proposal.id }}{% endblock %}
+{% block body %}
+{% set p = d.proposal %}
+<h1>Proposal {{ p.id }}: {{ "note" if p.kind == "note" else "mark as " ~ (kinds[p.kind] if p.kind in kinds else p.kind) }}</h1>
+{% include "_flash.html" %}
+<p><a href="/analyst">Back to the analyst</a> · from analyst run <a href="/analyst/runs/{{ p.agent_run_id }}">{{ p.agent_run_id }}</a> · {{ p.created_at|t }} · status <strong>{{ p.status }}</strong>{% if p.decided_by %} by {{ p.decided_by }}, {{ p.decided_at|t }}{% endif %}</p>
+{% if d.instruction_warning %}<p class="rule" role="alert">This finding's stored text contains wording that reads like instructions to an AI system. Someone who controls the scanned site may have written it to steer the analyst. Judge this proposal from the evidence below, not from the analyst's reason. (This warning is a hint from a word list, not a control: its absence proves nothing.)</p>{% endif %}
+{% if d.run_instruction_warning %}<p class="rule" role="alert">During the analyst run that made this proposal, text a tool returned from scan data contained wording that reads like instructions to an AI system (it may be anywhere the analyst read: a page title, a server banner, a DNS record, another finding). Judge this proposal from the evidence, not from the analyst's reason. (A hint from a word list, not a control: its absence proves nothing.)</p>{% endif %}
+{% if p.status == "pending" and d.out_of_date %}<p class="rule" role="alert">This proposal is out of date: {{ d.out_of_date }}. The analyst's reason was written about evidence that no longer exists, so it cannot be accepted. The current evidence is shown below; close the proposal, and mark the finding yourself on its page if it deserves a mark.</p>{% endif %}
+<div class="grid">
+<section class="card">
+<h2>What the analyst proposes (written by the model)</h2>
+<div class="pre">{{ p.reason }}</div>
+<p class="note">References: {{ refs(p.references) or "none" }}</p>
+{% if p.status == "pending" and d.out_of_date %}
+<form method="post" action="/analyst/proposals/{{ p.id }}/close" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary">Close as out of date</button></form>
+{% elif p.status == "pending" %}
+<form method="post" action="/analyst/proposals/{{ p.id }}/accept" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="evidence_fp" value="{{ d.shown_evidence_fp }}"><input type="hidden" name="snapshot_sha256" value="{{ d.shown_snapshot_sha256 }}"><button>Accept{% if p.kind != "note" %} and mark the finding{% endif %}</button></form>
+<form method="post" action="/analyst/proposals/{{ p.id }}/reject" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary">Reject</button></form>
+<p class="note">{% if p.kind == "note" %}An accepted note is shown to later analyst runs as context.{% else %}Accepting saves the mark as a manual mark would, for the evidence shown on this page (if the evidence changes before you click, nothing is saved and you are asked to review again): it never changes a score, verdict, status or count, and it goes stale if the finding reopens or its evidence changes. The mark's reason stays labeled as written by the analyst and accepted by you, and later analyst runs are not shown it.{% endif %}</p>
+{% elif p.closed_reason %}<p class="note">{{ p.closed_reason|capitalize }}.</p>
+{% endif %}
+</section>
+<section class="card">
+<h2>The finding, as stored (from the scan snapshot)</h2>
+{% set f = d.finding %}
+{% if f %}
+<p>{% if f.finding.finding_key is finding_key %}<a href="/findings/{{ f.finding.finding_key }}"><code>{{ f.finding.finding_key }}</code></a>{% else %}<code>{{ f.finding.finding_key }}</code>{% endif %} <span class="band b-{{ (f.finding.band or 'none')|lower }}">{{ f.finding.band or "-" }}</span> score {{ f.finding.score|n }} · {{ f.finding.status }} · {{ f.finding.hostname }} · {{ f.finding.source }} {{ f.finding.check_id }}</p>
+<p><strong>Title:</strong> {{ f.finding.title }}</p>
+{% if d.mark %}<p class="note">Current mark: {{ kinds.get(d.mark.kind, d.mark.kind) }} by {{ d.mark.created_by }}{% if d.mark.stale %} (stale: {{ d.mark.stale_why }}){% endif %}.</p>{% endif %}
+<h3>Matched</h3><div class="pre">{{ f.matched or "-" }}</div>
+<h3>Verification</h3><div class="pre">{{ f.verification or "-" }}</div>
+<h3>Description</h3><div class="pre">{{ f.description or "-" }}</div>
+<h3>Stored evidence</h3><pre class="pre">{{ f.evidence_text or "-" }}</pre>
+{% else %}<p class="note">{% if p.finding_key %}The finding is not in the current snapshot.{% else %}This note is not about one finding.{% endif %}</p>{% endif %}
+</section>
+</div>
+{% endblock %}

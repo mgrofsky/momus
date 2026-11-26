@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Version watch {{ d.id }}{% endblock %}
+{% block body %}
+{% set w = d.definition %}
+{% set r = d.result %}
+<h1>{% if w %}{{ w.name }}{% else %}Watch <code>{{ d.id }}</code>{% endif %}</h1>
+<p><a href="/version-watch">All watches</a> · <a href="/docs/version-watch">How version watch works</a></p>
+{% include "_flash.html" %}
+{% if not d.watched %}<p class="rule" role="note">No longer watched: this watch was removed. Its results stay until the scanner's retention removes them (90 days after its last result).</p>{% endif %}
+{% if d.suspect %}<p class="flash err" role="status">{{ d.suspect.text }}</p>{% endif %}
+
+{% if r %}
+<section class="card">
+<h2>Result of {{ r.date or "unknown date" }}</h2>
+<p class="note">{{ r.watch.product_name }}{% if r.job_id %}; job <code>{{ r.job_id }}</code>{% endif %}{% if r.generated_at %}; written {{ r.generated_at|t }}{% endif %}.{% if r.cves %} CVEs: {{ r.cves|join(", ") }}.{% endif %}{% if r.floors %} Fixed from: {% for b, v in r.floors.items() %}{{ v }}{% if not loop.last %}, {% endif %}{% endfor %}.{% endif %}</p>
+<ul class="bands">
+  <li><span>Hosts</span><strong>{{ r.headline.hosts|n }}</strong></li>
+  <li><span>FAIL</span><strong>{{ r.headline.fail|n }}</strong></li>
+  <li><span>PASS</span><strong>{{ r.headline.pass|n }}</strong></li>
+  <li><span>UNKNOWN</span><strong>{{ r.headline.unknown|n }}</strong></li>
+  <li><span>UNREACHABLE</span><strong>{{ r.headline.unreachable|n }}</strong></li>
+</ul>
+<p class="note">Targets: {{ r.targets.total|n }} in all; {{ r.targets.from_scan_db|n }} from the scan database{% if r.targets.scan_db_run %} (run <code>{{ r.targets.scan_db_run }}</code>){% endif %}, {{ r.targets.from_job|n }} named in the watch, {{ r.targets.carried|n }} carried from the previous result, {{ r.targets.not_probed|n }} not probed.</p>
+</section>
+
+<h2>Hosts</h2>
+{% if r.hosts %}
+<div class="scroll"><table><thead><tr><th>Host</th><th>Verdict</th><th>Version</th><th>Reason</th><th>Version read from</th><th>HTTPS</th><th>HTTP</th><th>Domain</th><th>Source</th><th>Server header</th></tr></thead><tbody>
+{% for h in r.hosts %}<tr><td><code>{{ h.hostname }}</code></td><td><span class="state v-{{ h.verdict }}">{{ h.verdict }}</span></td><td>{{ h.version or "-" }}</td>
+<td>{{ h.reason or "-" }}</td><td>{{ h.read_from or "-" }}</td><td>{{ h.https_status|n }}</td><td>{{ h.http_status|n }}</td><td><code>{{ h.domain }}</code></td>
+<td>{{ h.source }}</td><td class="pre">{{ h.server or "-" }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% else %}<p class="note">No hosts in this result.</p>{% endif %}
+
+<h2>{% if r.changes.since %}What changed since {{ r.changes.since }}{% else %}What changed{% endif %}</h2>
+{% if not r.changes.since %}<p class="note">No earlier result to compare with.</p>
+{% elif r.changes["items"] %}
+<div class="scroll"><table><thead><tr><th>Host</th><th>Before</th><th>Now</th></tr></thead><tbody>
+{% for c in r.changes["items"] %}<tr><td><code>{{ c.hostname }}</code></td>
+<td>{% if c.from_verdict is none %}not watched{% else %}{{ c.from_verdict }} {{ c.from_version or "" }}{% endif %}</td>
+<td>{% if c.to_verdict is none %}gone{% else %}{{ c.to_verdict }} {{ c.to_version or "" }}{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>
+{% else %}<p class="note">Nothing changed.</p>{% endif %}
+
+{% if r.history %}
+<h2>History</h2>
+<div class="scroll"><table><thead><tr><th>Date</th><th>Hosts</th><th>FAIL</th><th>PASS</th><th>UNKNOWN</th><th>UNREACHABLE</th></tr></thead><tbody>
+{% for x in r.history|reverse %}<tr><td>{{ x.date }}</td><td class="num">{{ x.hosts|n }}</td><td class="num">{{ x.fail|n }}</td><td class="num">{{ x.pass|n }}</td><td class="num">{{ x.unknown|n }}</td><td class="num">{{ x.unreachable|n }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% endif %}
+{% else %}
+<div class="empty">No result yet{% if not d.folder %}: no version-watch job has published one for this watch{% endif %}.</div>
+{% endif %}
+{% if d.dates %}<p class="note">Result files kept by the scanner (newest first): {{ d.dates|join(", ") }}.</p>{% endif %}
+
+<p class="note"><strong>What the probe sends.</strong> {{ d.probe }}</p>
+
+{% if w %}
+<section class="card">
+<h2>Definition</h2>
+<dl class="facts">
+  <dt>Id</dt><dd><code>{{ w.id }}</code></dd>
+  <dt>Product</dt><dd>{{ w.product_name }}</dd>
+  <dt>CVEs</dt><dd>{{ w.cves|join(", ") }}</dd>
+  <dt>Fixed releases</dt><dd>{{ w.floor_texts|join(", ") }}</dd>
+  <dt>Extra host names</dt><dd>{% if w.hosts %}{{ w.hosts|join(", ") }}{% else %}none{% endif %}</dd>
+  <dt>Changed</dt><dd>{{ w.updated_at|t }} by {{ w.updated_by }}</dd>
+</dl>
+<h3>Edit</h3>
+{% if error %}<p class="flash err" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="/version-watch/watches" class="stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="edit" value="1"><input type="hidden" name="watch_id" value="{{ w.id }}">
+  <label>Name <input name="name" required maxlength="80" autocomplete="off" value="{{ form.name }}"></label>
+  <label>Product <select name="product">{% for p in d.products %}<option value="{{ p.id }}"{% if form.product == p.id %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></label>
+  <label>CVE ids, one per line or separated by commas <textarea name="cves" rows="3" required>{{ form.cves }}</textarea></label>
+  <label>Fixed releases, one per line written x.y.z <textarea name="floors" rows="4" required>{{ form.floors }}</textarea></label>
+  <label>Extra host names (optional), one per line <textarea name="hosts" rows="3">{{ form.hosts }}</textarea></label>
+  <button>Save</button>
+</form>
+<h3>Remove</h3>
+<form method="post" action="/version-watch/watches/{{ w.id }}/remove" class="row">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label class="check"><input type="checkbox" name="confirm" value="yes" required> Remove this watch (its results stay until the scanner's retention removes them)</label>
+  <button class="warn">Remove watch</button>
+</form>
+</section>
+{% endif %}
+{% endblock %}

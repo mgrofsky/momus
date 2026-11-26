@@ -1,0 +1,46 @@
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# virtual environments
+.venv/
+venv/
+env/
+
+# local configuration and data
+.env
+data/
+runs/
+reports/
+published/
+jobs/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+*.db
+*.log
+.DS_Store
+Thumbs.db
+*.env
+
+# backups and local output: a backup holds the install secret, password hashes, raw output, and results
+backup/
+backups/
+demo-reports/
+jobctl-state/
+*.tar
+*.tar.gz
+*.tgz
+
+# editor backups and settings
+*~
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Docker secret files (the analyst's key, the seeder's keys) and the seeder's zone files
+secrets/
+seed-zones/

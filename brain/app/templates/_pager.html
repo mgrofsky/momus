@@ -1,0 +1,2 @@
+{# Previous/Next links for one paginated list. `param` is a fixed query parameter name, never data. #}
+{% macro pager(param, page, more) %}{% if page > 1 or more %}<p class="pager">{% if page > 1 %}<a href="?{{ param }}={{ page - 1 }}">Previous</a> {% endif %}<span class="note">page {{ page }}</span>{% if more %} <a href="?{{ param }}={{ page + 1 }}">Next</a>{% endif %}</p>{% endif %}{% endmacro %}

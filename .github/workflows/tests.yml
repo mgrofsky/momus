@@ -1,0 +1,82 @@
+# Tests on every push to main and on every pull request. Other branches are tested through their pull request, so a
+# branch pushed to this repository runs once, not twice.
+#
+# What it runs, the same commands CONTRIBUTING.md lists: the scanner unit tests, the documentation checks, the brain
+# tests, the seeder unit tests, the scanner shim test, the AWS template checks, the Google Cloud script checks, and the
+# two end-to-end scripts (each in its own job, so each has its own machine and the fixed lab range is never shared).
+# Left out: seeder/tests/run_container_test.sh. It bind-mounts a temporary folder owned by the runner's user into a
+# container that runs as another user, so whether the container can read it depends on the runner's file permissions.
+# Run it locally (CONTRIBUTING.md). It needs Docker and the scanner image, which the "checks" job builds; to add it,
+# put "seeder/tests/run_container_test.sh" as a step after the shim test.
+#
+# Least privilege: the token can only read the repository, no secret is used, nothing is published or pushed, and the
+# checkout does not keep the token in the local git configuration. Every action is pinned by its full commit hash.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Scanner unit tests
+        run: cd scanner/pipeline && python3 -B -m unittest
+
+      - name: Documentation checks
+        run: python3 -B -m unittest discover -s tests/docs
+
+      - name: Brain tests
+        run: brain/tests/run_tests.sh
+
+      - name: Seeder unit tests
+        run: seeder/tests/run_tests.sh
+
+      - name: Build the scanner image
+        run: docker build -t momus-scanner scanner/
+
+      - name: Scanner shim test
+        run: scanner/tests/run_shim_tests.sh
+
+      - name: AWS template checks (throwaway tools image, no network while checking)
+        run: |
+          printf 'FROM python:3.13-slim\nRUN pip install --no-cache-dir pyyaml cfn-lint\n' | docker build -t momus-cfn-tools -
+          docker run --rm --network none -v "$PWD:/src:ro" -w /src momus-cfn-tools python3 -B -m unittest deploy/aws/test_template.py
+          docker run --rm --network none -v "$PWD:/src:ro" -w /src momus-cfn-tools cfn-lint --regions us-east-1 -- deploy/aws/scanner-host.yaml
+
+      - name: Google Cloud script checks
+        run: deploy/gcp/test_momus_host.sh
+
+      - name: No bytecode or test caches were written into the tree
+        run: |
+          left=$(find . -path ./.git -prune -o \( -name __pycache__ -o -name '*.pyc' -o -name .pytest_cache \) -print)
+          if [ -n "$left" ]; then echo "$left"; exit 1; fi
+
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        script: [tests/e2e/run_demo.sh, tests/e2e/run_demo_ui.sh]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: End-to-end (${{ matrix.script }})
+        run: ${{ matrix.script }}

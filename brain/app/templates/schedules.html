@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Schedules{% endblock %}
+{% block body %}
+<h1>Schedules</h1>
+{% include "_flash.html" %}
+<p class="note">Times are in UTC. Now: {{ d.now|t }}. A slot is skipped (and recorded) when a job is still in flight; the scheduler never runs a missed slot late.</p>
+{% for r in d.rows %}
+<section class="card">
+<h2>{{ {"daily-recheck": "Daily recheck", "monthly-full": "Monthly full run", "daily-version-watch": "Daily version watch"}.get(r.kind, r.kind) }}</h2>
+<p>{{ "On" if r.enabled else "Off" }}{% if r.next_run %}; next run {{ r.next_run|t }}{% endif %}{% if r.last_slot %}; last slot {{ r.last_slot|t }}{% if r.last_outcome %} ({{ r.last_outcome }}){% endif %}{% endif %}</p>
+<form method="post" action="/schedules" class="row">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="kind" value="{{ r.kind }}">
+  <label class="check"><input type="checkbox" name="enabled"{% if r.enabled %} checked{% endif %}> On</label>
+  {% if r.kind == "monthly-full" %}<label>Day of month <input type="number" name="day_of_month" min="1" max="31" value="{{ r.day_of_month or 1 }}"></label>{% endif %}
+  <label>Hour (UTC) <input type="number" name="hour" min="0" max="23" value="{{ r.hour }}"></label>
+  <label>Minute <input type="number" name="minute" min="0" max="59" value="{{ r.minute }}"></label>
+  <button>Save</button>
+</form>
+{% if r.kind == "monthly-full" %}<p class="note">In a month without that day, the run happens on the month's last day.</p>{% endif %}
+{% if r.kind == "daily-version-watch" %}<p class="note">Queues a version-watch job carrying every watch on the <a href="/version-watch">Version watch</a> page; with no watch defined the slot is recorded as not queued.</p>{% endif %}
+</section>
+{% endfor %}
+{% endblock %}

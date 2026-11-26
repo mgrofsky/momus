@@ -1,0 +1,81 @@
+# Lab mode: the scanner and the deliberately weak demo target together, on one internal network with a fixed
+# private range, under their own project name (separate volumes and networks from a real scanner).
+#
+#   docker compose -f compose.yaml -f compose.lab.yaml up -d --build
+#
+# Why an override file and not a Compose profile: lab mode changes the scanner service itself (SCAN_LAB, the lab
+# range, its networks). A profile can only add services, so it would need a second scanner service next to the
+# real one, sharing or duplicating its volumes, and `docker compose --profile lab up` would start both. An extra
+# file that is never auto-loaded (it is not named compose.override.yaml) keeps lab mode out of the plain
+# `docker compose up` entirely, and its own project name keeps lab data out of real scan data.
+#
+# Every network here is internal (no route off the machine). The scanner's firewall allows SCAN_LAB_CIDR only
+# because SCAN_LAB=1; the runner accepts lab fields in a job only in this mode and only with this same range.
+name: momus-lab
+
+services:
+  scanner:
+    environment:
+      SCAN_LAB: "1"
+      SCAN_LAB_CIDR: 10.89.47.0/24
+    # Docker's resolver answers the lab names (target.demo.test, notice.demo.test) itself. Without this line it would
+    # forward every other name from the host, outside the scanner's firewall, even on an internal network (a
+    # scope-sync job asks dig for NS and TXT records). 10.89.47.53 is an unused address on the internal lab network:
+    # those questions go there from inside the container and get no answer. The entrypoint warns that this resolver
+    # is not globally routable (it is allowed on port 53 only, and lies inside the lab range anyway).
+    dns: [10.89.47.53]
+    networks: !override
+      lab:
+        ipv4_address: 10.89.47.2
+    restart: "no"
+
+  brain:
+    environment:
+      MOMUS_LAB: "1"
+      MOMUS_LAB_CIDR: 10.89.47.0/24
+      MOMUS_ALLOWED_ORIGINS: http://brain:8080   # lab: the browser (or tests/e2e/ui_driver.py) reaches it on brain_lab
+      # The analyst in lab mode: only the test providers work (the brain has no route out), so the lab uses the mock.
+      # These lines override anything an optional .env sets, so a real provider or key from .env never reaches the lab
+      # brain. The mock records no prompt here; tests/e2e/run_demo_ui.sh adds tests/e2e/compose.ui-e2e.yaml for that.
+      MOMUS_ANALYST_PROVIDER: mock
+      MOMUS_ANALYST_MODEL: mock-1
+      MOMUS_ANALYST_API_KEY: ""
+      MOMUS_ANALYST_API_KEY_FILE: ""
+      MOMUS_ANALYST_REGION: ""
+      MOMUS_ANALYST_METADATA_ONLY: "0"
+      MOMUS_ANALYST_AUTO_BRIEF: "0"
+      MOMUS_ANALYST_DEBUG: "0"
+      MOMUS_ANALYST_MOCK_RECORD: ""
+      MOMUS_ANALYST_PROXY: ""
+    ports: !reset []                  # lab mode: no published port (the network is internal); tests drive it from inside
+    networks: !override
+      brain_lab: {}
+    restart: "no"
+
+  demo-target:
+    build:
+      context: ./demo
+      dockerfile: target/Dockerfile
+    image: momus-demo-target
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks:
+      lab:
+        ipv4_address: 10.89.47.10
+        aliases: [target.demo.test, notice.demo.test]
+
+networks:
+  brain_net:
+    internal: true          # unused in lab mode; internal in case anything attaches to it
+  brain_lab:
+    internal: true          # the brain's own network in lab mode; shares nothing with the scanner's
+  scanner_egress:
+    internal: true          # unused in lab mode; internal in case anything attaches to it
+  seed_net:
+    internal: true          # the seeder (profile "seed") is not part of lab mode; internal in case it is started here
+  lab:
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.89.47.0/24

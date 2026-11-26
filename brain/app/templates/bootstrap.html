@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}First run{% endblock %}
+{% block body %}
+<section class="narrow">
+<h1>First run: create the admin account</h1>
+<p class="rule"><strong>{{ OWNERSHIP_RULE }}</strong></p>
+<p>Paste the one-time bootstrap token printed in the brain's container log (<code>docker compose logs brain</code>). It stops working once this account exists.</p>
+{% if error %}<p class="flash err" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="/bootstrap" class="stack">
+  <input type="hidden" name="csrf" value="{{ pre }}">
+  <label>Bootstrap token <input name="token" required maxlength="100" autocomplete="off"></label>
+  <label>Username <input name="username" required maxlength="64" autocomplete="username"></label>
+  <label>Password (at least {{ min_len }} characters) <input name="password" type="password" required minlength="{{ min_len }}" maxlength="1024" autocomplete="new-password"></label>
+  <label>Password again <input name="password2" type="password" required minlength="{{ min_len }}" maxlength="1024" autocomplete="new-password"></label>
+  <label class="check"><input type="checkbox" name="owner_rule" value="yes" required> I will only scan systems I explicitly own.</label>
+  <button>Create the admin account</button>
+</form>
+</section>
+{% endblock %}

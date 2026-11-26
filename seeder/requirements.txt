@@ -1,0 +1,26 @@
+# Exact pins with hashes; install with: pip install --require-hashes --no-deps --only-binary=:all: -r requirements.txt
+# The seeder's only package is boto3 (for the Route 53 source; imported only when that source is on); every other line
+# is a package boto3 requires. Versions and hashes are copied from brain/requirements.txt, which pins the same set;
+# seeder/tests/test_seed_dns.py checks that the two files agree line for line for these packages.
+# Each is a pure-Python wheel (py3-none-any) from PyPI, so one hash serves amd64 and arm64.
+# boto3: named runtime dependency (seeder): the AWS SDK, for the Route 53 source only
+boto3==1.44.11 \
+    --hash=sha256:a39a4d09ee47ab9a12e1dccf14b184d6002c5ae699d9205fda119aac69910119
+# botocore: transitive: required by boto3 and s3transfer
+botocore==1.44.11 \
+    --hash=sha256:441c5ebbad9bb2911120d12bda448d4b55793fc52fc7425d9392ebb02f4814a4
+# jmespath: transitive: required by boto3 and botocore
+jmespath==1.1.0 \
+    --hash=sha256:a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64
+# python-dateutil: transitive: required by botocore
+python-dateutil==2.9.0.post0 \
+    --hash=sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
+# s3transfer: transitive: required by boto3
+s3transfer==0.19.3 \
+    --hash=sha256:24eb7535804306355e31c952a90022bf5b2f9d760f9a11062c7493a217c08553
+# six: transitive: required by python-dateutil
+six==1.17.0 \
+    --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274
+# urllib3: transitive: required by botocore
+urllib3==2.8.0 \
+    --hash=sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3

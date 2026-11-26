@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Assets{% endblock %}
+{% block body %}
+<h1>Assets</h1>
+{% include "_snapshot_state.html" %}
+{% if d.run_id %}<p class="note">Inventory from run <code>{{ d.run_id }}</code>: {{ d.rows|length }} host(s).</p>{% endif %}
+{% if d.rows %}
+<div class="scroll"><table>
+<thead><tr><th>Host</th><th>Class</th><th>Title</th><th>Addresses</th><th>Hosting</th><th>Technology</th><th>Certificate</th><th>Ports</th></tr></thead>
+<tbody>
+{% for r in d.rows %}<tr>
+  <td>{% if r.hostname is hostname %}<a href="/assets/{{ r.hostname|urlencode }}"><code>{{ r.hostname }}</code></a>{% else %}<code>{{ r.hostname }}</code>{% endif %}</td>
+  <td>{{ r.class }}</td>
+  <td>{{ r.title or "-" }}</td>
+  <td>{% for ip in r.ips[:4] %}<code>{{ ip }}</code> {% endfor %}{% if r.ips|length > 4 %}+{{ r.ips|length - 4 }}{% endif %}</td>
+  <td>{{ r.hosting or "-" }}{% if r.cdn %} · {{ r.cdn }}{% endif %}</td>
+  <td>{{ (r.tech[:5])|join(", ") or (r.web_server or "-") }}</td>
+  <td>{{ r.cert_issuer or "-" }}{% if r.cert_expiry %}, expires {{ r.cert_expiry }}{% endif %}</td>
+  <td>{{ r.ports|join(" ") or "-" }}</td>
+</tr>{% endfor %}
+</tbody></table></div>
+{% elif d.snapshot.state == "ok" %}<p class="note">No hosts in the snapshot.</p>{% endif %}
+{% endblock %}

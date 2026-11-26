@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "_pager.html" import pager %}
+{% block title %}Runs{% endblock %}
+{% block body %}
+<h1>Runs</h1>
+{% include "_flash.html" %}
+{% block queue %}{% include "_queue.html" %}{% endblock %}
+<h2>Jobs</h2>
+<p class="note">Live status from the scanner's status files; refreshes every 5 seconds. Reports download as files and are never shown inside this application.</p>
+{% include "partials/jobs_table.html" %}
+{{ pager("jobs_page", d.jobs_page, d.jobs_more) }}
+{% if d.abandonable %}
+<section class="card">
+<h3>Jobs with no final status</h3>
+<p class="note">A job stays "in flight" until the scanner writes its final status, and nothing new is queued meanwhile. If its status file was lost (for example, the published volume was replaced), mark it abandoned: the brain removes the job file and leaves a marker so the scanner never runs it. Only do this when the scanner is not running it.</p>
+{% for jid in d.abandonable %}
+<form method="post" action="/runs/abandon" class="inline">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="job_id" value="{{ jid }}">
+  <code>{{ jid }}</code>
+  <label class="check"><input type="checkbox" name="confirm" value="yes" required> The scanner is not running this job</label>
+  <button class="secondary">Mark abandoned</button>
+</form>
+{% endfor %}
+</section>
+{% endif %}
+<h2>Scan runs in the current snapshot</h2>
+{% include "_snapshot_state.html" %}
+{% if d.scan_runs %}
+<div class="scroll"><table><thead><tr><th>Run</th><th>Kind</th><th>Started</th><th>Finished</th><th>Evidence</th></tr></thead><tbody>
+{% for r in d.scan_runs %}<tr><td><code>{{ r.run_id }}</code></td><td>{{ r.kind or "-" }}</td><td>{{ r.started|t }}</td><td>{{ r.finished|t }}</td><td>{{ r.evidence_level or "-" }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% endif %}
+{{ pager("runs_page", d.runs_page, d.runs_more) }}
+{% endblock %}

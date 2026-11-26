@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block body %}
+<h1>{{ title }}</h1>
+<p>{{ text }}</p>
+{% if link %}<p><a href="{{ link }}">Continue</a></p>{% endif %}
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "_pager.html" import pager %}
+{% block title %}Host{% endblock %}
+{% block body %}
+<p><a href="/assets">Assets</a></p>
+<h1><code>{{ host }}</code></h1>
+{% set a = d.asset %}
+<dl class="facts">
+  <dt>Class</dt><dd>{{ a.class or "-" }}{% if a.reason %} ({{ a.reason }}){% endif %}</dd>
+  <dt>Addresses</dt><dd>{% for ip in a.ips %}<code>{{ ip }}</code> {% endfor %}</dd>
+  <dt>CNAMEs</dt><dd>{% for x in a.cnames %}<code>{{ x }}</code> {% endfor %}</dd>
+  <dt>Page title</dt><dd>{{ a.title or "-" }}</dd>
+  <dt>Server</dt><dd>{{ a.server or "-" }}</dd>
+  <dt>WAF</dt><dd>{{ a.waf or "-" }}</dd>
+  <dt>Technology</dt><dd>{{ a.tech|join(", ") or "-" }}</dd>
+  <dt>From run</dt><dd><code>{{ d.run_id }}</code></dd>
+</dl>
+{% if d.profile %}<h2>Hosting</h2><dl class="facts">
+{% for k in ["hosting","asn","as_name","cdn","waf","load_balancer","os","web_server","language","framework","cms","tls_min","tls_max","cert_issuer","cert_expiry","eol_count"] %}<dt>{{ k|replace("_"," ") }}</dt><dd>{{ d.profile[k]|n }}</dd>{% endfor %}
+</dl>{% endif %}
+{% macro table(rows, cols) %}{% if rows %}<div class="scroll"><table><thead><tr>{% for c in cols %}<th>{{ c|replace("_"," ") }}</th>{% endfor %}</tr></thead><tbody>
+{% for r in rows %}<tr>{% for c in cols %}<td>{{ r[c]|n }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>{% else %}<p class="note">None recorded.</p>{% endif %}{% endmacro %}
+<h2>Findings</h2>
+{% if d.findings %}<div class="scroll"><table><thead><tr><th>Band</th><th>Score</th><th>Finding</th><th>Host</th><th>Source</th><th>Status</th><th>Verdict</th></tr></thead><tbody>
+{% for r in d.findings %}{% include "_finding_row.html" %}{% endfor %}</tbody></table></div>{% else %}<p class="note">None.</p>{% endif %}
+<h2>Components</h2>{{ table(d.components, ["category","name","version","source","eol","eol_date"]) }}
+<h2>Certificates</h2>{{ table(d.certificates, ["port","subject","issuer","key_type","key_bits","sig_alg","not_after","days_left","self_signed"]) }}{{ pager("cert_page", d.certificates_page, d.certificates_more) }}
+<h2>TLS</h2>{{ table(d.tls, ["port","protocols","legacy","preferred_cipher","weak_ciphers"]) }}{{ pager("tls_page", d.tls_page, d.tls_more) }}
+<h2>Ports</h2>{{ table(d.ports, ["ip","port","proto","service","product","risky"]) }}
+<h2>Web endpoints</h2>{{ table(d.endpoints, ["url","status","final_url","title","server","content_type","emails"]) }}
+<h2>DNS records</h2>{{ table(d.dns, ["rtype","name","value","ttl"]) }}
+{% endblock %}

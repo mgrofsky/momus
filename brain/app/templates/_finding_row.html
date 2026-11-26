@@ -1,0 +1,10 @@
+<tr>
+  <td><span class="band b-{{ (r.band or 'none')|lower }}">{{ r.band or "-" }}</span></td>
+  <td class="num">{{ r.score|n }}</td>
+  <td>{% if r.finding_key is finding_key %}<a href="/findings/{{ r.finding_key|urlencode }}">{{ r.title or r.check_id or r.finding_key }}</a>{% else %}{{ r.title or r.check_id or r.finding_key }}{% endif %} <code class="note">{{ r.check_id }}</code>
+    {% if r.mark %}<span class="tag {% if r.mark.stale %}stale{% endif %}">{{ "stale mark" if r.mark.stale else r.mark.kind|replace("_", " ") }}</span>{% endif %}</td>
+  <td><code>{{ r.hostname }}{% if r.port %}:{{ r.port }}{% endif %}</code></td>
+  <td>{{ r.source }}</td>
+  <td>{{ r.status }}{% if r.state and r.status == "open" %} ({{ r.state }}){% endif %}</td>
+  <td>{{ r.verdict or "-" }}</td>
+</tr>

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Findings{% endblock %}
+{% block body %}
+<h1>Findings</h1>
+{% include "_snapshot_state.html" %}
+<form method="get" action="/findings" class="filters" hx-get="/findings" hx-target="#results" hx-select="#results" hx-swap="outerHTML" hx-trigger="change">
+  <label>Band <select name="band"><option value="">any</option>{% for b in ["Critical","High","Medium","Low"] %}<option{% if p.band == b %} selected{% endif %}>{{ b }}</option>{% endfor %}</select></label>
+  <label>State <select name="state"><option value="">any</option>{% for s in ["open","new","reopened","persistent","fixed"] %}<option{% if p.state == s %} selected{% endif %}>{{ s }}</option>{% endfor %}</select></label>
+  <label>Domain <select name="domain"><option value="">any</option>{% for x in d.facets.domains %}<option{% if p.domain == x %} selected{% endif %}>{{ x }}</option>{% endfor %}</select></label>
+  <label>Class <select name="class"><option value="">any</option>{% for x in d.facets.classes %}<option{% if p.klass == x %} selected{% endif %}>{{ x }}</option>{% endfor %}</select></label>
+  <label>Source <select name="source"><option value="">any</option>{% for x in ["dns","http","nmap","sslscan","nuclei"] %}<option{% if p.source == x %} selected{% endif %}>{{ x }}</option>{% endfor %}</select></label>
+  <label>Marks <select name="marked">{% for v, l in [("any","any"),("unmarked","unmarked or stale"),("marked","marked")] %}<option value="{{ v }}"{% if (p.marked or "any") == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
+  <label>Sort <select name="sort">{% for v in ["priority","host","title","first_seen","last_seen","source"] %}<option{% if p.sort == v %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+  <button>Apply</button>
+</form>
+<div id="results">
+  <p class="note">{{ d.total }} finding(s){% if p.default %}: open and not marked (a stale mark counts as unmarked){% endif %}. Marks never change a score, verdict, status or the counts by band.</p>
+  {% if d.rows %}
+  <div class="scroll"><table>
+    <thead><tr><th>Band</th><th>Score</th><th>Finding</th><th>Host</th><th>Source</th><th>Status</th><th>Verdict</th></tr></thead>
+    <tbody>{% for r in d.rows %}{% include "_finding_row.html" %}{% endfor %}</tbody>
+  </table></div>
+  {% set base = {"band": p.band or "", "state": p.state or "", "domain": p.domain or "", "class": p.klass or "", "source": p.source or "", "marked": p.marked or "", "sort": p.sort} %}
+  <p class="pager">{% if p.page > 1 %}<a href="?{{ dict(base, page=p.page - 1)|urlencode }}">Previous</a>{% endif %}
+  {% if d.total > p.page * 100 %}<a href="?{{ dict(base, page=p.page + 1)|urlencode }}">Next</a>{% endif %}</p>
+  {% endif %}
+</div>
+{% endblock %}

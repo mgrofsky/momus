@@ -1,0 +1,47 @@
+# keep caches, VCS data, local secrets and scan output out of every build context
+__pycache__
+**/__pycache__
+*.pyc
+**/*.pyc
+.git
+.env
+*.env
+**/.env
+**/*.env
+data/
+runs/
+reports/
+published/
+jobs/
+
+# backups and local output: a backup holds the install secret, password hashes, raw output, and results
+backup/
+backups/
+demo-reports/
+jobctl-state/
+*.tar
+**/*.tar
+*.tar.gz
+**/*.tar.gz
+*.tgz
+**/*.tgz
+
+# OS metadata, local databases, logs, and editor backups
+.DS_Store
+**/.DS_Store
+*.sqlite*
+**/*.sqlite*
+*.db
+**/*.db
+*.log
+**/*.log
+*~
+**/*~
+*.swp
+**/*.swp
+*.swo
+**/*.swo
+.idea
+**/.idea
+.vscode
+**/.vscode

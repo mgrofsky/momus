@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}API{% endblock %}
+{% block body %}
+<h1>API</h1>
+<p>JSON under <code>/api/v1/</code>, with the same session as the pages. Every POST needs the header <code>X-CSRF-Token</code> (from <code>GET /api/v1/me</code>) and an <code>Origin</code> header naming this instance. The full schema: <a href="/api/v1/openapi.json">/api/v1/openapi.json</a> (signed-in users only).</p>
+<div class="scroll"><table><thead><tr><th>Method</th><th>Path</th><th>What it does</th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.method }}</td><td><code>{{ r.path }}</code></td><td>{{ r.summary }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

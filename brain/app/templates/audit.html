@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Audit log{% endblock %}
+{% block body %}
+<h1>Audit log</h1>
+<form method="get" action="/audit" class="filters">
+  <label>Action <select name="action"><option value="">any</option>{% for a in actions %}<option{% if sel.action == a %} selected{% endif %}>{{ a }}</option>{% endfor %}</select></label>
+  <label>Who <input name="actor" value="{{ sel.actor }}" maxlength="100"></label>
+  <label>Text <input name="q" value="{{ sel.q }}" maxlength="100"></label>
+  <button>Filter</button>
+</form>
+<p class="note">Append-only. Newest first, 200 entries per page.</p>
+<div class="scroll"><table><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Target</th><th>Detail</th><th>From</th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.at|t }}</td><td>{{ r.actor }}</td><td>{{ r.action }}</td><td><code>{{ r.target or "" }}</code></td><td>{{ r.detail or "" }}</td><td>{{ r.address or "" }}</td></tr>{% endfor %}
+</tbody></table></div>
+<p class="pager">{% if newest %}<a href="/audit">Newest entries</a> {% endif %}{% if older %}<a href="/audit?{{ older|urlencode }}">Older entries</a>{% endif %}</p>
+{% endblock %}

@@ -1,0 +1,63 @@
+name: Bug report
+description: Something does not work as the documentation says.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not paste scan results, host names, addresses, tokens, or keys from a real install.** Issues are public. Reproduce the problem with the lab demo (README, "Quick start: the lab demo") where possible, and replace anything from a real install with reserved names such as `example.test` and documentation addresses such as `192.0.2.1`.
+
+        A security vulnerability is not a bug report: report it privately, as SECURITY.md describes.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The release (for example 0.1.0) or the commit you built from (`git rev-parse --short HEAD`).
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - Lab mode (compose.lab.yaml)
+        - Real scans (compose.yaml only)
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The commands or the pages you used, in order.
+      placeholder: |
+        1. docker compose -f compose.yaml -f compose.lab.yaml up -d --build scanner demo-target
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: What happened instead. Error messages and log lines help; remove anything from a real install first.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, CPU architecture (amd64 or arm64), Docker and Compose versions.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: This report contains no scan results, host names, addresses, tokens, or keys from a real install.
+          required: true

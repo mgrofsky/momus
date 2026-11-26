@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Version watch{% endblock %}
+{% block body %}
+<h1>Version watch</h1>
+{% include "_flash.html" %}
+<div class="rule" role="note">
+  <p><strong>What the probe sends.</strong> {{ d.probe }}</p>
+  <p>An example watch, and how each verdict is reached: <a href="/docs/version-watch">version watch</a>. Version-watch jobs are queued on the <a href="/runs">Runs</a> page or by the daily schedule (<a href="/schedules">Schedules</a>); each carries every watch below.</p>
+</div>
+
+<h2>Watches</h2>
+{% if d.watches %}
+<div class="scroll"><table><thead><tr><th>Watch</th><th>Product</th><th>CVEs</th><th>Fixed releases</th><th>Hosts</th><th>FAIL</th><th>PASS</th><th>UNKNOWN</th><th>UNREACHABLE</th><th>Result of</th></tr></thead><tbody>
+{% for w in d.watches %}<tr>
+<td>{% if w.id is watch_id %}<a href="/version-watch/{{ w.id }}">{{ w.name }}</a>{% else %}{{ w.name }}{% endif %}<br><code>{{ w.id }}</code></td>
+<td>{{ w.product_name }}</td>
+<td>{{ w.cves|join(", ") }}</td>
+<td>{{ w.floor_texts|join(", ") }}</td>
+{% if w.latest %}
+<td class="num">{{ w.latest.headline.hosts|n }}</td><td class="num">{{ w.latest.headline.fail|n }}</td><td class="num">{{ w.latest.headline.pass|n }}</td><td class="num">{{ w.latest.headline.unknown|n }}</td><td class="num">{{ w.latest.headline.unreachable|n }}</td>
+<td>{{ w.latest.date or "unknown" }}{% if w.suspect %}<p class="flash err" role="status">{{ w.suspect.text }}</p>{% endif %}</td>
+{% else %}
+<td colspan="5">No result yet.</td>
+<td>{% if w.suspect %}<p class="flash err" role="status">{{ w.suspect.text }}</p>{% else %}-{% endif %}</td>
+{% endif %}
+</tr>{% endfor %}
+</tbody></table></div>
+{% else %}
+<div class="empty">No watches yet. Add one below{% if d.folder == "missing" %} (the published folder is not mounted, so no results can be shown){% endif %}.</div>
+{% endif %}
+
+{% if d.retired %}
+<h2>No longer watched</h2>
+<p class="note">Results of watches that were removed. The scanner keeps them for 90 days after their last result.</p>
+<ul>{% for wid in d.retired %}{% if wid is watch_id %}<li><a href="/version-watch/{{ wid }}"><code>{{ wid }}</code></a> (no longer watched)</li>{% endif %}{% endfor %}</ul>
+{% endif %}
+
+<section class="card">
+<h2>Add a watch</h2>
+{% if error %}<p class="flash err" role="alert">{{ error }}</p>{% endif %}
+{% if d.full %}
+<p class="note">There are {{ d.max_watches }} watches, the most a version-watch job can carry. Remove one to add another.</p>
+{% else %}
+<form method="post" action="/version-watch/watches" class="stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label>Id: 2 to 32 characters, a-z, 0-9 and "-". It names the results folder and cannot be changed later. <input name="watch_id" required maxlength="32" autocomplete="off" value="{{ form.watch_id }}"></label>
+  <label>Name: letters, digits, spaces and . _ , - <input name="name" required maxlength="80" autocomplete="off" value="{{ form.name }}"></label>
+  <label>Product <select name="product">{% for p in d.products %}<option value="{{ p.id }}"{% if form.product == p.id %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></label>
+  <label>CVE ids, one per line or separated by commas (1 to 20) <textarea name="cves" rows="3" required>{{ form.cves }}</textarea></label>
+  <label>Fixed releases, one per line written x.y.z: the lowest fixed release of branch x.y (1 to 16 branches) <textarea name="floors" rows="4" required>{{ form.floors }}</textarea></label>
+  <label>Extra host names (optional), one per line; hosts the scan database lists with this product are watched anyway <textarea name="hosts" rows="3">{{ form.hosts }}</textarea></label>
+  <button>Add watch</button>
+</form>
+{% endif %}
+</section>
+{% endblock %}

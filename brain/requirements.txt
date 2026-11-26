@@ -1,0 +1,150 @@
+# Exact pins with hashes; install with: pip install --require-hashes --no-deps -r requirements.txt
+# Hashes cover the Linux wheels for CPython 3.13 on arm64 (aarch64) and amd64 (x86_64), from PyPI.
+# Eight packages are chosen by this project (fastapi, uvicorn, jinja2, python-multipart, and for the analyst the
+# four official model SDKs anthropic, openai, google-genai, boto3); every other line is a dependency they require, pinned so the whole set is reproducible.
+# Not installed by pip: htmx 2.0.7, vendored as app/static/vendor/htmx-2.0.7.min.js (Zero-Clause BSD, license text
+# beside it, copied verbatim from the htmx.org 2.0.7 npm package). Its SHA-256,
+# 60231ae6ba9db3825eb15a261122d5f55921c4d53b66bf637dc18b4ee27c79f9, equals that package's dist/htmx.min.js
+# and matches two public package mirrors for 2.0.7.
+# annotated-doc: transitive: required by fastapi
+annotated-doc==0.0.7 \
+    --hash=sha256:6bc31bbbec6dfaaedc1676dbc11dbda96fe22a2b5c400e9ebad113fec44a9dc6
+# annotated-types: transitive: required by pydantic
+annotated-types==0.8.0 \
+    --hash=sha256:f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0
+# anthropic: named runtime dependency (analyst): official Anthropic SDK, imported only by app/llm/anthropic_client.py
+anthropic==2.14.0 \
+    --hash=sha256:5cf986851f61c0858ac88c6f7c28490369a68ff4a89c309849605b764da0664d
+# anyio: transitive: required by fastapi and starlette
+anyio==4.16.0 \
+    --hash=sha256:c66ae634e0b8228396b801741beb3294326d4b6102f7bba4041c0dfb58c29026
+# boto3: named runtime dependency (analyst): official AWS SDK for Bedrock, imported only by app/llm/bedrock_client.py
+boto3==1.44.11 \
+    --hash=sha256:a39a4d09ee47ab9a12e1dccf14b184d6002c5ae699d9205fda119aac69910119
+# botocore: transitive: required by boto3 and s3transfer
+botocore==1.44.11 \
+    --hash=sha256:441c5ebbad9bb2911120d12bda448d4b55793fc52fc7425d9392ebb02f4814a4
+# certifi: transitive: required by requests (google-auth, google-genai); also by httpx in the test image
+certifi==2026.11.20 \
+    --hash=sha256:7422df25243767b9877031a2248cb14d09ddac9beee846f4cef3d5c9191d488f
+# cffi: transitive: required by cryptography (compiled; one wheel per architecture)
+cffi==2.1.1 \
+    --hash=sha256:a931079504ecc49efed7744c476a5c343a92fabf66dec2db95edb1b2fdc770e2 \
+    --hash=sha256:f16c709686a78c727bbbf059f92b0bf41c6fc60deec706d2dc19f529175a6125
+# charset-normalizer: transitive: required by requests (compiled; one wheel per architecture)
+charset-normalizer==3.5.3 \
+    --hash=sha256:656b9744bac4493561d28b56d7d646afd7a8471254ef7004d849aa8368020037 \
+    --hash=sha256:fd0341b9dea133d187d7c5a2cd7e21ae6449a7b68ea8c2454f9cf77def11ec1b
+# click: transitive: required by uvicorn (command line)
+click==8.5.1 \
+    --hash=sha256:8bb5376d2006950386f8c6427613334a2acadc5f559cb80e638d00b4df957e37
+# cryptography: transitive: required by google-auth (compiled; one wheel per architecture)
+cryptography==50.0.2 \
+    --hash=sha256:4061c0079120205fb760c58acab6443e217307dcf05e3702cf970e0689972856 \
+    --hash=sha256:f9f6143a8c75945eb960d9eb98905a441394abfa24afaae239d514ffb2586480
+# distro: transitive: required by google-genai
+distro==1.9.0 \
+    --hash=sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2
+# docstring-parser: transitive: required by anthropic
+docstring-parser==0.18.0 \
+    --hash=sha256:b3fcbed555c47d8479be0796ef7e19c2670d428d72e96da63f3a40122860374b
+# fastapi: named runtime dependency: the web framework (routing, request parsing, OpenAPI schema)
+fastapi==0.165.0 \
+    --hash=sha256:896f48462042bb4f162147eb8fac7e858753dc1f486765709baf105d70e4fc5b
+# google-auth: transitive: required by google-genai (the adapter passes an API key; no Google Cloud credentials are used)
+google-auth==2.63.1 \
+    --hash=sha256:3c977ca57114a302c2589f3a24be7ca1b6862d30da7619f4230a78809f58a0e9
+# google-genai: named runtime dependency (analyst): official Gemini SDK, imported only by app/llm/gemini_client.py
+google-genai==3.6.1 \
+    --hash=sha256:4b35064da644f61d7e5f6c0e9406bf63b945e7e96b4af18cadb3371cbc3acf74
+# h11: transitive: required by uvicorn (HTTP/1.1 parser)
+h11==0.16.0 \
+    --hash=sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86
+# httpcore2: transitive: required by httpx2
+httpcore2==2.16.2 \
+    --hash=sha256:16051ae2a42f776007543f32de9349a317b23d2cbb4e1456b4bac0e88b87419a
+# httpx2: transitive: required by anthropic, openai and google-genai (their HTTP client)
+httpx2==2.16.2 \
+    --hash=sha256:f05c13aade4c45dbf1c9060647a1058f0acad62398fad96e741269edb33d46f5
+# idna: transitive: required by anyio
+idna==3.20 \
+    --hash=sha256:ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c
+# jinja2: named runtime dependency: auto-escaping templates
+jinja2==3.1.6 \
+    --hash=sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
+# jiter: transitive: required by anthropic and openai (compiled; one wheel per architecture)
+jiter==0.19.0 \
+    --hash=sha256:3b27d6bec319dc17cdced13e495f90ce066676ca296fc56f2dd2128f6a7599ed \
+    --hash=sha256:d056e8cf0ad1c4676ae559311d4a90b2613ca415452f5072bee62ee7424a094a
+# jmespath: transitive: required by boto3 and botocore
+jmespath==1.1.0 \
+    --hash=sha256:a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64
+# markupsafe: transitive: required by jinja2 (the escaping itself; one wheel per architecture)
+markupsafe==3.0.4 \
+    --hash=sha256:434139499bb20b502ed3baa1f169e618f924a97e7a777fea1a49446d80106cf6 \
+    --hash=sha256:7018d4af1cd272e847aa5917983ab5e83e4f6579f9dbfecd4a79c0ca80b144c2
+# openai: named runtime dependency (analyst): official OpenAI SDK, imported only by app/llm/openai_client.py
+openai==3.59.0 \
+    --hash=sha256:e613537ac5f082c58f652a536ed4215b19a29d360c4348cca86f0e563f7a0b1f
+# opentelemetry-api: transitive: required by fastapi since 0.16x; the API package only, no SDK and no exporter, so it records and sends nothing
+opentelemetry-api==1.45.2 \
+    --hash=sha256:2cbd737377e710ee740d261c94e93fa0f08e6d037c18f17513cc0a2d94479a34
+# pyasn1: transitive: required by pyasn1-modules
+pyasn1==0.6.5 \
+    --hash=sha256:4017b0fce125096b8573b39c989fdb1a4b19cf761e683398184550fea0e66587
+# pyasn1-modules: transitive: required by google-auth
+pyasn1-modules==0.4.2 \
+    --hash=sha256:29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a
+# pycparser: transitive: required by cffi
+pycparser==3.12 \
+    --hash=sha256:a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e
+# pydantic: transitive: required by fastapi (request and response models)
+pydantic==2.14.4 \
+    --hash=sha256:653a2ad9f6d8858529c77c72717d0ea991d6c6837fe683246b2f4b2bbfc3fadc
+# pydantic-core: transitive: required by pydantic (compiled; one wheel per architecture)
+pydantic-core==2.50.5 \
+    --hash=sha256:8bbe282e79dc71b24ba7be284eacf27c8ddff8f26911e2030a0dd123c6aed326 \
+    --hash=sha256:cbfde3ad127786f1dea1a6cd89a5eb824a16203f24743ad2b4e07506f43bc844
+# python-dateutil: transitive: required by botocore
+python-dateutil==2.9.0.post0 \
+    --hash=sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
+# python-multipart: named runtime dependency: HTML form parsing
+python-multipart==0.0.34 \
+    --hash=sha256:ebacd224bd686eee2f9aa1066a657affe07435a185834e05e5235e2e59173e91
+# requests: transitive: required by google-genai and google-auth
+requests==2.34.2 \
+    --hash=sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0
+# s3transfer: transitive: required by boto3
+s3transfer==0.19.3 \
+    --hash=sha256:24eb7535804306355e31c952a90022bf5b2f9d760f9a11062c7493a217c08553
+# six: transitive: required by python-dateutil
+six==1.17.0 \
+    --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274
+# sniffio: transitive: required by anthropic, openai and google-genai
+sniffio==1.3.1 \
+    --hash=sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2
+# starlette: transitive: required by fastapi (ASGI toolkit, test client)
+starlette==1.10.0 \
+    --hash=sha256:478c0ab3b4ced6e82719849c118fa406f0278a3499c1a898cd15cd31bdc38ce4
+# tenacity: transitive: required by google-genai
+tenacity==9.1.4 \
+    --hash=sha256:6095a360c919085f28c6527de529e76a06ad89b23659fa881ae0649b867a9d55
+# truststore: transitive: required by httpx2 and httpcore2
+truststore==0.10.5 \
+    --hash=sha256:9aaaedaefaf06d8b206278cf8b5012bc897f485a874503501e12d776df78951c
+# typing-extensions: transitive: required by fastapi, pydantic, pydantic-core, opentelemetry-api
+typing-extensions==4.16.0 \
+    --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8
+# typing-inspection: transitive: required by fastapi and pydantic
+typing-inspection==0.4.5 \
+    --hash=sha256:bc210535442b39e1bf2805e0c7a17dfd6a4ace760c84c7f7d16245d23a6b1c39
+# urllib3: transitive: required by botocore and requests
+urllib3==2.8.0 \
+    --hash=sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3
+# uvicorn: named runtime dependency: the ASGI server (plain install, no [standard] extras)
+uvicorn==0.54.0 \
+    --hash=sha256:505bdb0f318731d45f1f712071fc781a8981f6847a31c902c9f5e652d4f67faf
+# websockets: transitive: required by google-genai (its live API, not used here; compiled, one wheel per architecture)
+websockets==17.4 \
+    --hash=sha256:25eb661d8ba7e2b85ebb4e7a1bb9f6a3280910ed10b84330a7abfb5ed32d2764 \
+    --hash=sha256:c74954409ea5789f7a60daa5f94580c00ad0b60b20751c47b35c4784877b5057

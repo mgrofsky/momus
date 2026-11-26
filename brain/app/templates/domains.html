@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Domains{% endblock %}
+{% block body %}
+<h1>Domains: email and DNS posture</h1>
+{% include "_snapshot_state.html" %}
+{% if d.rows %}
+<p class="note">From run <code>{{ d.run_id }}</code>.</p>
+<div class="scroll"><table>
+<thead><tr><th>Domain</th><th>SPF</th><th>DMARC</th><th>DKIM</th><th>MX</th><th>CAA</th><th>Nameservers</th></tr></thead>
+<tbody>{% for r in d.rows %}<tr>
+<td><code>{{ r.apex }}</code></td>
+<td>{{ "yes" if r.spf else "no" }}{% if r.spf_policy %} ({{ r.spf_policy }}){% endif %}</td>
+<td>{{ "yes" if r.dmarc else "no" }}{% if r.dmarc_policy %} (p={{ r.dmarc_policy }}{% if r.dmarc_sp %}, sp={{ r.dmarc_sp }}{% endif %}){% endif %}</td>
+<td>{{ "yes" if r.dkim else "no" }}</td>
+<td>{{ r.mx|join(", ") or "-" }}{% if r.mx_provider %} ({{ r.mx_provider }}){% endif %}</td>
+<td>{{ "yes" if r.caa else "no" }}{% if r.caa_issuers %}: {{ r.caa_issuers|join(", ") }}{% endif %}</td>
+<td>{{ r.nameservers|join(", ") or "-" }}{% if r.ns_provider %} ({{ r.ns_provider }}){% endif %}</td>
+</tr>{% endfor %}</tbody></table></div>
+{% elif d.snapshot.state == "ok" %}<p class="note">No domain posture in the snapshot yet (it comes from a full run).</p>{% endif %}
+{% endblock %}

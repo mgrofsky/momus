@@ -1,0 +1,4 @@
+<div id="analyst-live"{% if s.running %} hx-get="/analyst/live" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %} role="status">
+{% if s.running %}<p><span class="state s-running">Running</span>: analyst run <a href="/analyst/runs/{{ s.running.id }}">{{ s.running.id }}</a> ({{ s.running.kind }}), step {{ s.running.steps }}, started {{ s.running.started_at|t }}. Reload the page when it is done.</p>
+{% else %}<p class="note">No analyst run in progress.</p>{% endif %}
+</div>

@@ -1,0 +1,517 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Momus host. One Ubuntu EC2 instance in its own VPC running the project's Compose stack, Session Manager
+  access only (no key pair, no inbound rule), IMDSv2 required with hop limit 2, encrypted root volume, Elastic IP
+  for a static outbound address, daily DLM snapshots, StatusCheckFailed alarm. Written from the AWS documentation;
+  not deployed by the author of this template (see README.md).
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t4g.large
+    AllowedPattern: "^[a-z][a-z0-9-]*[.][a-z0-9]+$"
+    ConstraintDescription: an EC2 instance type such as t4g.large or t3.large
+    Description: Graviton (t4g, arm64) with the arm64 image below, or x86 (t3) with the amd64 image
+  ImageParameter:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id
+    AllowedValues:
+      - /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id
+      - /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+    Description: >-
+      Public Systems Manager parameter for Canonical's current Ubuntu Server 24.04 LTS image (arm64 or amd64,
+      matching InstanceType). The scanner is a container, so the host needs no security distribution.
+  RootDeviceName:
+    Type: String
+    Default: /dev/sda1
+    AllowedValues:
+      - /dev/sda1
+      - /dev/xvda
+    Description: >-
+      The image's root device name (the AWS documentation: "/dev/sda1 or /dev/xvda", depending on the image). It must
+      match the image, or the volume below is attached as a second disk and the root keeps the image's own size and
+      encryption. Check it before deploying (README.md).
+  VolumeGb:
+    Type: Number
+    Default: 60
+    MinValue: 30
+    MaxValue: 1024
+  VpcCidr:
+    Type: String
+    Default: 172.24.96.0/24
+    AllowedPattern: "^(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])([.](25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}/(1[6-9]|2[0-8])$"
+    ConstraintDescription: an IPv4 CIDR block from /16 to /28
+  AlarmEmail:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}[.][A-Za-z]{2,63}$"
+    ConstraintDescription: empty, or one email address
+    Description: Email subscribed to the alarm topic when the stack creates the topic
+  ExistingAlarmTopicArn:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^arn:aws[a-z-]*:sns:[a-z0-9-]+:[0-9]{12}:[A-Za-z0-9_-]{1,256}$"
+    ConstraintDescription: empty, or an SNS topic ARN
+    Description: Existing SNS topic for the alarm; empty means the stack creates one
+  SeederRoleArn:
+    Type: String
+    Default: ""
+    # Accepts an ARN of any partition (arn:aws:, arn:aws-cn:, ...); only the standard partition (arn:aws:) is supported.
+    AllowedPattern: "^$|^arn:aws[a-z-]*:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]{1,512}$"
+    ConstraintDescription: empty, or one IAM role ARN
+    Description: >-
+      Optional: one IAM role the seeder may assume before reading Route 53 (SEED_ROUTE53_ROLE_ARN), for example
+      a read-only DNS role in another account. Empty means the host can assume no role.
+  SeederHostedZoneIds:
+    Type: CommaDelimitedList
+    Default: ""
+    AllowedPattern: "^$|^[A-Z0-9]{1,32}$"
+    ConstraintDescription: empty, or Route 53 hosted zone ids (letters and digits) separated by commas
+    Description: >-
+      Optional: the public hosted zones in this account the seeder may read (SEED_ROUTE53=1). Empty means the
+      instance role gets no Route 53 permission.
+  BedrockAccess:
+    Type: String
+    Default: none
+    AllowedValues:
+      - none
+      - model
+      - global-profile
+    Description: >-
+      Optional permission for the brain's analyst to call Amazon Bedrock (Converse, which needs bedrock:InvokeModel)
+      with the instance role. none (default) grants nothing; model allows one foundation model in BedrockRegion;
+      global-profile allows that model through its global cross-Region inference profile (MOMUS_ANALYST_MODEL
+      global.<model id>).
+  BedrockModelId:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^[a-z0-9][a-z0-9.:-]{0,127}$"
+    ConstraintDescription: empty, or a Bedrock foundation model id such as provider.model-name-v1:0 (no profile prefix)
+    Description: The foundation model id, without a global. prefix. Required unless BedrockAccess is none.
+  BedrockRegion:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^[a-z]{2}(-[a-z]+)+-[0-9]{1,2}$"
+    ConstraintDescription: empty (this stack's region), or a region name such as us-east-1
+    Description: The region the brain calls (MOMUS_ANALYST_REGION). Empty means this stack's region.
+
+Conditions:
+  HasSeederRole:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref SeederRoleArn
+          - ""
+  HasSeederZones:
+    Fn::Not:
+      - Fn::Equals:
+          - Fn::Join:
+              - ""
+              - !Ref SeederHostedZoneIds
+          - ""
+  BedrockModel:
+    Fn::Equals:
+      - !Ref BedrockAccess
+      - model
+  BedrockGlobal:
+    Fn::Equals:
+      - !Ref BedrockAccess
+      - global-profile
+  BedrockRegionGiven:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref BedrockRegion
+          - ""
+  CreateTopic:
+    Fn::Equals:
+      - !Ref ExistingAlarmTopicArn
+      - ""
+  SubscribeEmail:
+    Fn::And:
+      - Condition: CreateTopic
+      - Fn::Not:
+          - Fn::Equals:
+              - !Ref AlarmEmail
+              - ""
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: scanner-host
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: scanner-host
+
+  VpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref VpcCidr
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: scanner-host-public
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: scanner-host
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref RouteTable
+
+  ScannerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: scanner-host
+      GroupDescription: scanner host no ingress and egress all ports
+      VpcId: !Ref Vpc
+      SecurityGroupIngress: []
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+          Description: scanner egress all ports
+      Tags:
+        - Key: Name
+          Value: scanner-host
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      # Session Manager only. Every other permission below is optional and off by default.
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  # The seeder (Compose profile "seed"): assume one role first (SEED_ROUTE53_ROLE_ARN).
+  SeederAssumeRolePolicy:
+    Type: AWS::IAM::Policy
+    Condition: HasSeederRole
+    Properties:
+      PolicyName: momus-seeder-assume-role
+      Roles:
+        - !Ref InstanceRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AssumeSeederRole
+            Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Resource: !Ref SeederRoleArn
+
+  # The seeder: list hosted zones (this action has no resource type, so it needs "*") and read the record sets of
+  # the zones named in SeederHostedZoneIds only.
+  SeederRoute53Policy:
+    Type: AWS::IAM::Policy
+    Condition: HasSeederZones
+    Properties:
+      PolicyName: momus-seeder-route53
+      Roles:
+        - !Ref InstanceRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ListHostedZones
+            Effect: Allow
+            Action:
+              - route53:ListHostedZones
+            Resource: "*"
+          - Sid: ListRecordSetsOfNamedZones
+            Effect: Allow
+            Action:
+              - route53:ListResourceRecordSets
+            Resource:
+              Fn::Split:
+                - ","
+                - Fn::Join:
+                    - ""
+                    - - "arn:aws:route53:::hostedzone/"
+                      - Fn::Join:
+                          - ",arn:aws:route53:::hostedzone/"
+                          - !Ref SeederHostedZoneIds
+
+  # The brain's analyst, BedrockAccess=model: Converse with one foundation model in one region, and the provider
+  # check tool's read of that same model (GetFoundationModel).
+  BedrockModelPolicy:
+    Type: AWS::IAM::Policy
+    Condition: BedrockModel
+    Properties:
+      PolicyName: momus-bedrock-model
+      Roles:
+        - !Ref InstanceRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: InvokeOneFoundationModel
+            Effect: Allow
+            Action:
+              - bedrock:InvokeModel
+            Resource:
+              - Fn::Sub:
+                  - arn:${AWS::Partition}:bedrock:${Region}::foundation-model/${BedrockModelId}
+                  - Region: !If [BedrockRegionGiven, !Ref BedrockRegion, !Ref "AWS::Region"]
+          - Sid: CheckOneFoundationModel
+            Effect: Allow
+            Action:
+              - bedrock:GetFoundationModel
+            Resource:
+              - Fn::Sub:
+                  - arn:${AWS::Partition}:bedrock:${Region}::foundation-model/${BedrockModelId}
+                  - Region: !If [BedrockRegionGiven, !Ref BedrockRegion, !Ref "AWS::Region"]
+
+  # The brain's analyst, BedrockAccess=global-profile: the three statements of the Bedrock user guide's example
+  # for a global cross-Region inference profile (the profile in the requesting region; the model in that region and
+  # the global model ARN, which has no region or account, each only when called through that profile), and the
+  # provider check tool's read of that same profile (GetInferenceProfile), under the same region condition.
+  BedrockGlobalPolicy:
+    Type: AWS::IAM::Policy
+    Condition: BedrockGlobal
+    Properties:
+      PolicyName: momus-bedrock-global-profile
+      Roles:
+        - !Ref InstanceRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: GrantGlobalCrisInferenceProfileRegionAccess
+            Effect: Allow
+            Action:
+              - bedrock:InvokeModel
+            Resource:
+              - Fn::Sub:
+                  - arn:${AWS::Partition}:bedrock:${Region}:${AWS::AccountId}:inference-profile/global.${BedrockModelId}
+                  - Region: !If [BedrockRegionGiven, !Ref BedrockRegion, !Ref "AWS::Region"]
+            Condition:
+              StringEquals:
+                aws:RequestedRegion: !If [BedrockRegionGiven, !Ref BedrockRegion, !Ref "AWS::Region"]
+          - Sid: GrantGlobalCrisInferenceProfileInRegionModelAccess
+            Effect: Allow
+            Action:
+              - bedrock:InvokeModel
+            Resource:
+              - Fn::Sub:
+                  - arn:${AWS::Partition}:bedrock:${Region}::foundation-model/${BedrockModelId}
+                  - Region: !If [BedrockRegionGiven, !Ref BedrockRegion, !Ref "AWS::Region"]
+            Condition:
+              StringEquals:
+                aws:RequestedRegion: !If [BedrockRegionGiven, !Ref BedrockRegion, !Ref "AWS::Region"]
+                bedrock:InferenceProfileArn:
+                  Fn::Sub:
+                    - arn:${AWS::Partition}:bedrock:${Region}:${AWS::AccountId}:inference-profile/global.${BedrockModelId}
+                    - Region: !If [BedrockRegionGiven, !Ref BedrockRegion, !Ref "AWS::Region"]
+          - Sid: GrantGlobalCrisInferenceProfileGlobalModelAccess
+            Effect: Allow
+            Action:
+              - bedrock:InvokeModel
+            Resource:
+              - !Sub arn:${AWS::Partition}:bedrock:::foundation-model/${BedrockModelId}
+            Condition:
+              StringEquals:
+                aws:RequestedRegion: unspecified
+                bedrock:InferenceProfileArn:
+                  Fn::Sub:
+                    - arn:${AWS::Partition}:bedrock:${Region}:${AWS::AccountId}:inference-profile/global.${BedrockModelId}
+                    - Region: !If [BedrockRegionGiven, !Ref BedrockRegion, !Ref "AWS::Region"]
+          - Sid: CheckTheGlobalInferenceProfile
+            Effect: Allow
+            Action:
+              - bedrock:GetInferenceProfile
+            Resource:
+              - Fn::Sub:
+                  - arn:${AWS::Partition}:bedrock:${Region}:${AWS::AccountId}:inference-profile/global.${BedrockModelId}
+                  - Region: !If [BedrockRegionGiven, !Ref BedrockRegion, !Ref "AWS::Region"]
+            Condition:
+              StringEquals:
+                aws:RequestedRegion: !If [BedrockRegionGiven, !Ref BedrockRegion, !Ref "AWS::Region"]
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref InstanceRole
+
+  ScannerInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: DefaultRoute
+    Properties:
+      ImageId: !Ref ImageParameter
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds:
+        - !Ref ScannerSecurityGroup
+      # IMDSv2 only. Hop limit 2 (not 1) so a container on this host (the brain, for Bedrock with the instance role;
+      # the seeder, for Route 53) can obtain the role's credentials. Consequence: every container on the host can
+      # reach the metadata service, except the scanner, whose egress firewall rejects 169.254.0.0/16 and verifies
+      # that at every start (scanner/entrypoint.sh). See README.md.
+      MetadataOptions:
+        HttpTokens: required
+        HttpEndpoint: enabled
+        HttpPutResponseHopLimit: 2
+      BlockDeviceMappings:
+        - DeviceName: !Ref RootDeviceName
+          Ebs:
+            VolumeType: gp3
+            VolumeSize: !Ref VolumeGb
+            Encrypted: true
+            DeleteOnTermination: true
+      # Docker and the Compose plugin from Ubuntu's own archive, and nothing else. No repository is cloned and the
+      # stack is not started here: README.md has the steps to take after connecting.
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          set -eu
+          exec >>/var/log/momus-userdata.log 2>&1
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends docker.io docker-buildx docker-compose-v2
+          systemctl enable --now docker
+          echo "userdata done $(date -u +%FT%TZ)"
+      Tags:
+        - Key: Name
+          Value: scanner-host
+        - Key: Backup
+          Value: scan
+        - Key: Project
+          Value: scan
+
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: scanner-host
+
+  ElasticIpAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt ElasticIp.AllocationId
+      InstanceId: !Ref ScannerInstance
+
+  DlmRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: dlm.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole
+
+  SnapshotPolicy:
+    Type: AWS::DLM::LifecyclePolicy
+    Properties:
+      Description: Daily EBS snapshots of the scanner host keep 7
+      State: ENABLED
+      ExecutionRoleArn: !GetAtt DlmRole.Arn
+      PolicyDetails:
+        PolicyType: EBS_SNAPSHOT_MANAGEMENT
+        ResourceTypes:
+          - INSTANCE
+        TargetTags:
+          - Key: Backup
+            Value: scan
+        Schedules:
+          - Name: daily
+            CopyTags: true
+            CreateRule:
+              Interval: 24
+              IntervalUnit: HOURS
+              Times:
+                - "10:00"
+            RetainRule:
+              Count: 7
+
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Condition: CreateTopic
+    Properties:
+      DisplayName: scanner-host-alarms
+
+  AlarmSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: SubscribeEmail
+    Properties:
+      TopicArn: !Ref AlarmTopic
+      Protocol: email
+      Endpoint: !Ref AlarmEmail
+
+  StatusCheckAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: scanner host failed EC2 status checks for 10 minutes
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref ScannerInstance
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: breaching
+      AlarmActions:
+        - Fn::If:
+            - CreateTopic
+            - !Ref AlarmTopic
+            - !Ref ExistingAlarmTopicArn
+
+Outputs:
+  InstanceId:
+    Value: !Ref ScannerInstance
+  PublicIp:
+    Value: !Ref ElasticIp
+  TopicArn:
+    Value:
+      Fn::If:
+        - CreateTopic
+        - !Ref AlarmTopic
+        - !Ref ExistingAlarmTopicArn
+  SecurityGroupId:
+    Value: !Ref ScannerSecurityGroup

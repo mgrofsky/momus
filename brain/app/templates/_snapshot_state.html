@@ -1,0 +1,6 @@
+{% if d.snapshot.state != "ok" %}
+<div class="empty {% if d.snapshot.state in ('mismatch','bad-pointer','unreadable','too-large','refused') %}bad{% endif %}" role="status">
+  <strong>{% if d.snapshot.state in ('mismatch','bad-pointer','unreadable','too-large','refused') %}Snapshot refused.{% else %}No results yet.{% endif %}</strong>
+  {{ d.snapshot.message }}
+</div>
+{% endif %}

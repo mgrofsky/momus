@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "_analyst_refs.html" import refs %}
+{% block title %}Analyst run {{ r.id }}{% endblock %}
+{% block body %}
+<h1>Analyst run {{ r.id }}</h1>
+<p><a href="/analyst">Back to the analyst</a></p>
+<dl class="facts">
+<dt>kind</dt><dd>{{ r.kind }}</dd><dt>trigger</dt><dd>{{ r.trigger }}</dd><dt>requested by</dt><dd>{{ r.requested_by or "-" }}</dd>
+<dt>provider and model</dt><dd><code>{{ r.provider }}</code> <code>{{ r.model }}</code></dd>
+<dt>snapshot</dt><dd>scan run <code>{{ r.scan_run_id or "-" }}</code>, SHA-256 <code>{{ r.snapshot_sha256 or "-" }}</code></dd>
+<dt>metadata-only</dt><dd>{{ "yes" if r.metadata_only else "no" }}</dd>
+<dt>status</dt><dd>{{ r.status }}{% if r.outcome %} ({{ r.outcome }}: {{ r.outcome_text }}){% endif %}</dd>
+<dt>error</dt><dd>{{ r.error or "-" }}</dd>
+<dt>started / finished</dt><dd>{{ r.started_at|t }} / {{ r.finished_at|t }}</dd>
+<dt>steps</dt><dd>{{ r.steps }}, of which {{ r.invalid_answers }} invalid answer(s)</dd>
+<dt>tokens in / out</dt><dd>{{ r.tokens_in }} / {{ r.tokens_out }}</dd>
+<dt>tools called</dt><dd>{{ r.tools|join(", ") or "none" }}</dd>
+<dt>limits</dt><dd>{% for k, v in r.limits.items() %}{{ k|replace("_", " ") }} {{ v }}{% if not loop.last %}; {% endif %}{% endfor %}</dd>
+</dl>
+{% if r.question %}<h2>Question</h2><div class="pre">{{ r.question }}</div>{% endif %}
+<h2>Steps</h2>
+<div class="scroll"><table><thead><tr><th>Step</th><th>Kind</th><th>Tool</th><th>Arguments</th><th>Result size</th><th>Tokens in / out</th><th>Error</th></tr></thead><tbody>
+{% for s in r.steps %}<tr><td>{{ s.step }}</td><td>{{ s.kind }}</td><td>{{ s.tool or "-" }}</td><td>{% if s.arguments %}<span class="note">Arguments (the model's own text)</span> <code class="pre">{{ s.arguments }}</code>{% endif %}</td>
+<td>{{ s.result_bytes if s.result_bytes is not none else "" }}</td><td>{{ s.tokens_in }} / {{ s.tokens_out }}</td><td>{{ s.error or "" }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% if r.dropped %}<h2>Dropped by the validator</h2><ul>{% for x in r.dropped %}<li>{{ x.what }}{% if x.index is not none %} {{ x.index }}{% endif %}: {{ x.why }}</li>{% endfor %}</ul>{% endif %}
+{% if r.proposals %}<h2>Proposals</h2><ul>{% for p in r.proposals %}<li><a href="/analyst/proposals/{{ p.id }}">{{ p.id }}</a> {{ p.kind|replace("_", " ") }}{% if p.finding_key is finding_key %} on <code>{{ p.finding_key }}</code>{% endif %}: {{ p.status }}</li>{% endfor %}</ul>{% endif %}
+{% if r.result %}<h2>Final answer (written by the model)</h2>
+{% if r.kind == "chat" %}<div class="pre">{{ r.result.answer }}</div><p class="note">References: {{ refs(r.result.references) or "none" }}</p>
+{% else %}<p>See the brief on the <a href="/analyst">analyst page</a>.</p>{% endif %}{% endif %}
+{% if r.messages %}<h2>Prompts and responses (debug)</h2>{% for m in r.messages %}<h3>Step {{ m.seq }}: {{ m.role }}</h3><div class="pre">{{ m.content }}</div>{% endfor %}{% endif %}
+{% endblock %}

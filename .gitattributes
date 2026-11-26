@@ -1,0 +1,11 @@
+# Text files are stored with LF line endings and checked out with LF on every platform.
+* text=auto eol=lf
+
+# Shell scripts and Dockerfiles must keep LF, or they fail inside the Linux containers.
+*.sh text eol=lf
+scanner/tests/shim/bin/* text eol=lf
+Dockerfile text eol=lf
+**/Dockerfile text eol=lf
+
+# The diagram exports. The PNGs are binary; the SVGs stay text.
+docs/diagrams/*.png binary

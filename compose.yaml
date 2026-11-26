@@ -1,0 +1,158 @@
+# Momus: the scanner and the brain. One rule: only the scanner sends packets to
+# targets, and it shares no network with the brain. They exchange files only:
+#   jobs       brain writes, scanner reads (read-only in the scanner)
+#   published  scanner writes, brain reads (read-only in the brain)
+#   seed       the optional seeder writes, scanner reads (read-only in the scanner; the brain never mounts it)
+#   seed_scope the scanner writes the list of DNS-verified domains, the optional seeder reads it (read-only there; the
+#              brain never mounts it). The seeder mounts nothing else of the scanner's.
+#
+#   docker compose up -d --build            the scanner and the brain (no lab mode, no demo target, no seeder)
+#   docker compose --profile seed run --rm seeder     the optional DNS seeder, once (see the seeder service)
+# Lab mode with the demo target is a separate file and project, never loaded by the plain command above:
+#   docker compose -f compose.yaml -f compose.lab.yaml up -d --build        (see compose.lab.yaml)
+name: momus
+
+services:
+  scanner:
+    build: ./scanner
+    image: momus-scanner
+    # entrypoint.sh starts as root with these capabilities only: NET_ADMIN installs the egress firewall; SETUID,
+    # SETGID and SETPCAP are used once, for the drop to uid 10001 with every capability set empty. The runner and
+    # every scan tool run with no capabilities and no-new-privileges. Without NET_ADMIN the container exits.
+    cap_drop: [ALL]
+    cap_add: [NET_ADMIN, SETUID, SETGID, SETPCAP]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+    volumes:
+      - scan_data:/var/lib/scan          # scope, runs, scan database, reports
+      - jobs:/srv/jobs:ro                # job files from the brain
+      - published:/srv/published         # status, snapshots, reports, scope status, heartbeat
+      - seed:/srv/seed:ro                # host names from the optional seeder (untrusted input; recon phase 1)
+      - seed_scope:/srv/seed-scope       # verified_domains.json for the optional seeder (written here only)
+    environment:
+      SCAN_KEEP_SNAPSHOTS: "10"
+      SCAN_JOB_MAX_AGE_HOURS: "72"       # a job created longer ago is refused with a final status (1 to 8760)
+    networks: [scanner_egress]           # its own network: outbound to public addresses only (entrypoint.sh)
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- brain
+  # The web application: UI and API on 127.0.0.1:8080 only, the scheduler, the app database. It writes job files
+  # and reads published results; it never sends anything to a scan target and shares no network with the scanner.
+  # First start prints a one-time bootstrap token:  docker compose logs brain
+  brain:
+    build:
+      context: .
+      dockerfile: brain/Dockerfile
+      target: runtime
+    image: momus-brain
+    user: "10001:10001"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    env_file:
+      - path: .env                       # optional; every setting and its default is in .env.example
+        required: false
+    # The analyst (off by default; docs/analyst.md). Its key can come from a Docker secret instead of .env:
+    #   secrets: [momus_analyst_api_key]     with MOMUS_ANALYST_API_KEY_FILE=/run/secrets/momus_analyst_api_key in .env,
+    #   and the top-level "secrets:" entry at the end of this file uncommented.
+    volumes:
+      - brain_data:/data                 # app database (users, scope, schedules, marks, audit log)
+      - jobs:/srv/jobs                   # job files for the scanner (written here)
+      - published:/srv/published:ro      # results from the scanner (read-only here)
+    ports:
+      - "127.0.0.1:8080:8080"            # localhost only; a reverse proxy with TLS needs MOMUS_ALLOWED_ORIGINS, MOMUS_COOKIE_SECURE and MOMUS_TRUSTED_PROXY (.env.example)
+    # Its own network, never scanner_egress. brain_net is a normal bridge network so that, when the analyst is
+    # configured, the brain can reach the ONE model provider chosen (api.anthropic.com, api.openai.com,
+    # generativelanguage.googleapis.com, or bedrock-runtime.<region>.amazonaws.com and the AWS credential endpoints).
+    # It needs nothing else outbound, and with MOMUS_ANALYST_PROVIDER=none (the default) it makes no outbound connection.
+    # Docker cannot limit outbound traffic by destination: to enforce "the provider only", put an egress proxy or a
+    # host firewall rule in front of this network.
+    networks: [brain_net]
+    restart: unless-stopped
+
+  # Developer tool (scanner/jobctl.py), kept beside the brain for tests and debugging. No network at all; it only writes job files
+  # and reads published results. Run it on demand, e.g.:  docker compose run --rm jobctl status
+  jobctl:
+    profiles: [dev]
+    image: momus-scanner
+    entrypoint: ["python3", "-I", "-B", "/app/scanner/jobctl.py", "--state", "/srv/jobctl"]
+    user: "10001:10001"
+    network_mode: none
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    volumes:
+      - jobs:/srv/jobs
+      - published:/srv/published:ro
+      - jobctl_state:/srv/jobctl
+
+  # ---------------------------------------------------------------- seeder (optional; off unless the profile is used)
+  # Lists host names from DNS sources you control (Route 53, zone files, zone transfer, the PowerDNS API) for the
+  # domains the scanner has DNS-verified, into the "seed" volume, which the scanner reads (read-only) at the start
+  # of discovery and passes through its name gate like every other source. A plain "docker compose up" never starts it.
+  #   docker compose --profile seed run --rm seeder       run once (SEED_INTERVAL_MINUTES unset or 0), then exit
+  #   docker compose --profile seed up -d seeder          keep it running, with SEED_INTERVAL_MINUTES=15 or more
+  # Its settings come from seed.env (optional, never committed): the SEED_* variables in .env.example. It never reads
+  # .env, so it never receives the brain's settings or the analyst's key, and the brain never receives its settings.
+  # Credentials: the PowerDNS key and, for Route 53 off AWS, a static AWS credentials file, as Docker secrets (the
+  # commented "secrets:" lines below and at the end of this file); on an AWS host, the instance role through the
+  # default credential chain (deploy/aws/README.md). They are never logged and never written to the seed volume.
+  seeder:
+    profiles: [seed]
+    build:
+      context: .
+      dockerfile: seeder/Dockerfile
+    image: momus-seeder
+    user: "10002:10002"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    env_file:
+      - path: seed.env                   # optional; SEED_* settings (see .env.example)
+        required: false
+    # secrets: [momus_seed_pdns_api_key]    # read from /run/secrets/momus_seed_pdns_api_key (SEED_PDNS_API_KEY_FILE)
+    # secrets: [momus_seed_aws_credentials] # with AWS_SHARED_CREDENTIALS_FILE=/run/secrets/momus_seed_aws_credentials in seed.env
+    # It does not mount the scanner's published folder (snapshots, reports): only the list of verified domains.
+    volumes:
+      - seed_scope:/srv/seed-scope:ro    # verified_domains.json: the DNS-verified domains (only those are seeded)
+      - seed:/srv/seed                   # seed_hosts.txt and status.json (written only here)
+      - ./seed-zones:/srv/seed-zones:ro  # zone files or host lists, used only with SEED_ZONE_FILES=1 (never committed)
+    # Its own network with ordinary outbound access, because it must reach your DNS services (which may be on private
+    # addresses). No published port, no route to the scanner or the brain. It contacts only the DNS services you
+    # configure; a transfer server is usually the zone's own name server, which can be a host in scope, and the
+    # scanner's firewall and exclusions do not apply to the seeder. Nothing taken from an answer is ever contacted.
+    networks: [seed_net]
+    # Memory is capped: the largest accepted PowerDNS answer (8 MiB) or zone file (16 MiB) stays below it, but the
+    # largest zone file leaves little margin. In interval mode a seeder stopped by this limit stays down until restarted; status.json's
+    # time shows how old the seed list is.
+    mem_limit: 512m
+    restart: "no"
+
+networks:
+  scanner_egress: {}
+  brain_net: {}                          # ordinary outbound access; the brain needs only the model provider, nothing enforces that (see the brain service)
+  seed_net: {}                           # the seeder only: outbound to your DNS services
+
+volumes:
+  brain_data: {}
+  scan_data: {}
+  jobs: {}
+  published: {}
+  jobctl_state: {}
+  seed: {}                               # seeder writes (uid 10002), scanner reads; the brain does not mount it
+  seed_scope: {}                         # scanner writes (uid 10001) the verified domains, seeder reads; not the brain
+
+# The analyst's key as a Docker secret (optional; see the brain service), and the seeder's (optional; see the seeder):
+# secrets:
+#   momus_analyst_api_key:
+#     file: ./secrets/momus_analyst_api_key
+#   momus_seed_pdns_api_key:
+#     file: ./secrets/momus_seed_pdns_api_key
+#   momus_seed_aws_credentials:
+#     file: ./secrets/momus_seed_aws_credentials

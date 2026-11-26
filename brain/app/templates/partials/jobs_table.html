@@ -1,0 +1,13 @@
+<div id="jobs-live" hx-get="/runs/live?jobs_page={{ d.jobs_page or 1 }}" hx-trigger="every 5s" hx-swap="outerHTML">
+{% if d.jobs %}
+<div class="scroll"><table>
+<thead><tr><th>Job</th><th>Type</th><th>State</th><th>Phase / reason</th><th>Queued</th><th>Ended</th><th>By</th><th>Reports</th></tr></thead>
+<tbody>{% for j in d.jobs %}<tr>
+<td><code>{{ j.job_id }}</code></td><td>{{ j.type or "-" }}{% if j.lab %} (lab){% endif %}</td>
+<td><span class="state s-{{ j.state }}">{{ "written, not yet picked up" if j.state == "written" else j.state }}</span></td>
+<td>{{ j.phase or j.reason or "" }}{% if j.domains %}<br><span class="note">Domains: {{ j.domains.scanned }} scanned, {{ j.domains.held_back }} held back (added after the approved inventory), {{ j.domains.pending }} pending (not verified)</span>{% endif %}</td><td>{{ j.queued_at|t }}</td><td>{{ j.ended_at|t if j.ended_at else "" }}</td>
+<td>{{ j.created_by or "-" }}{% if j.trigger and j.trigger != "user" %} ({{ j.trigger }}){% endif %}</td>
+<td>{% for r in j.reports %}{% if j.run_id is job_id %}<a href="/runs/{{ j.run_id|urlencode }}/files/{{ r.name|urlencode }}" download>{{ r.name }}</a>{% else %}{{ r.name }}{% endif %} {% endfor %}</td>
+</tr>{% endfor %}</tbody></table></div>
+{% else %}<p class="note">No jobs yet.</p>{% endif %}
+</div>

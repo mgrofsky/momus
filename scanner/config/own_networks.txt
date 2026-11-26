@@ -1,0 +1,7 @@
+# Your own networks and colocation providers, for the hosting column.
+# fingerprint.py matches each substring (case-insensitive) inside a host's AS name, before the
+# built-in cloud and hosting providers, and shows the label instead.
+#
+# Format: one entry per line, substring<TAB>label. Lines starting with # are ignored.
+# Example (remove the leading "# " and use a real tab):
+# example-colo	Example colo (own network)

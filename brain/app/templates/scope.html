@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Scope{% endblock %}
+{% block body %}
+<h1>Scope</h1>
+<div class="rule" role="note">
+  <p><strong>{{ OWNERSHIP_RULE }}</strong></p>
+  <p>Only DNS-verified domains are scanned: the scanner checks a TXT record at the start of every run and refuses any domain that fails. {{ DUE_CARE }}</p>
+  <p>What leaves this machine during a scan, and to whom: <a href="/docs/data-flows">data flows</a>.</p>
+</div>
+{% include "_flash.html" %}
+
+<section class="card">
+<h2>Check profile</h2>
+<form method="post" action="/scope/profile" class="row">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% if d.profile.check_profile == "active" %}
+  <input type="hidden" name="check_profile" value="safe">
+  <p>Aggressive checks are <strong>on</strong> (active profile: default-login, SQL injection, RCE, LFI, SSRF, XSS and injection templates).</p>
+  <button>Turn aggressive checks off</button>
+  {% else %}
+  <input type="hidden" name="check_profile" value="active">
+  <p>Aggressive checks are <strong>off</strong> (safe profile, the default).</p>
+  <button class="warn">Turn aggressive checks on</button>
+  {% endif %}
+</form>
+<form method="post" action="/scope/profile" class="row">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label>Rate <select name="rate_profile">{% for v in ["low","normal","fast"] %}<option{% if d.profile.rate_profile == v %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+  <label>Evidence kept <select name="evidence">{% for v, l in [("minimal","minimal (default)"),("excerpt","excerpt (redacted response excerpt)")] %}<option value="{{ v }}"{% if d.profile.evidence == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
+  <button>Save</button>
+</form>
+<p class="note">Profiles apply from the next job. Last changed {{ d.profile.updated_at|t }}{% if d.profile.updated_by %} by {{ d.profile.updated_by }}{% endif %}.</p>
+</section>
+
+{% block domains %}{% include "_scope_domains.html" %}{% endblock %}
+
+<section class="card">
+<h2>Inventory approval</h2>
+{% if d.approval %}<p>Active phases (port scans, TLS scan, templates) are approved for the hosts and addresses listed by inventory run <code>{{ d.approval.inventory_run }}</code> (approved by {{ d.approval.approved_by }}, {{ d.approval.approved_at|t }}).</p>
+<form method="post" action="/scope/approve/withdraw" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary">Withdraw the approval</button></form>
+{% else %}<p>No inventory approved: full runs do discovery and web checks only until one is.</p>{% endif %}
+<p class="note">{% if d.lab %}The scanner accepts an approval only when that inventory covered every lab target now in scope{% else %}The scanner accepts an approval when that inventory covered at least one domain now in scope{% endif %}, and it runs active phases only on hosts the inventory listed, at the addresses it listed (a host behind a CDN or provider that the inventory classed by its CNAME may change address while its CNAME stays with that provider). A domain added after the approved inventory gets inventory checks only, and the domains already approved keep being scanned; run and approve a new inventory to scan it.</p>
+{% if d.approvable %}
+<h3>Finished inventory runs</h3>
+<ul>{% for s in d.approvable %}<li><code>{{ s.run_id }}</code>, ended {{ s.ended_at|t }}, {{ s.counts.assets|n }} host(s)
+{% if not d.approval or d.approval.inventory_run != s.run_id %}<form method="post" action="/scope/approve" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="inventory_run" value="{{ s.run_id }}"><button>Approve after review</button></form>{% else %} (approved){% endif %}</li>{% endfor %}</ul>
+{% endif %}
+{% if d.inventory_run %}
+<details><summary>Review inventory <code>{{ d.inventory_run }}</code> ({{ d.inventory|length }} host(s), from the current snapshot)</summary>
+<div class="scroll"><table><thead><tr><th>Host</th><th>Class</th><th>Addresses</th><th>Title</th></tr></thead><tbody>
+{% for r in d.inventory %}<tr><td><code>{{ r.hostname }}</code></td><td>{{ r.class }}</td><td>{% for ip in r.ips %}<code>{{ ip }}</code> {% endfor %}</td><td>{{ r.title or "" }}</td></tr>{% endfor %}
+</tbody></table></div></details>
+{% endif %}
+{% if d.awaiting %}
+<h3>Awaiting approval</h3>
+<p class="note">Hosts the scanner held back in its latest full run or recheck: new, or with a changed address, since the approved inventory, or under a domain added after it. Active phases do not run on them until a newer inventory is approved. Addresses are the scanner's.</p>
+<div class="scroll"><table><thead><tr><th>Host</th><th>Class</th><th>Addresses now</th><th>Why</th></tr></thead><tbody>
+{% for r in d.awaiting %}<tr><td><code>{{ r.hostname }}</code></td><td>{{ r["class"] or "-" }}</td><td>{% for ip in r.ips %}<code>{{ ip }}</code> {% endfor %}</td><td>{{ r.why }}{% if r.before %} (was {{ r.before|join(", ") }}){% endif %}</td></tr>{% endfor %}
+</tbody></table></div>
+{% endif %}
+</section>
+
+<section class="card">
+<h2>Unverified hosts</h2>
+<p class="note">Hosts the scanner could not tie to your own addresses. They get web checks only; approve one to allow port scans on it.</p>
+{% if d.unverified %}<ul>{% for r in d.unverified %}<li><code>{{ r.hostname }}</code> {% for ip in r.ips %}<code>{{ ip }}</code> {% endfor %}
+<form method="post" action="/scope/entries" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="kind" value="host"><input type="hidden" name="value" value="{{ r.hostname }}"><button class="secondary">Approve for port scans</button></form></li>{% endfor %}</ul>
+{% else %}<p class="note">None.</p>{% endif %}
+</section>
+
+{% for kind, title, rows, col, hint in [("exclusion","Exclusions",d.exclusions,"value","host name, *.suffix, .suffix, or CIDR"),("range","Owned ranges",d.owned_ranges,"cidr","public CIDR you own"),("host","Approved hosts (port scans allowed)",d.approved_hosts,"hostname","host name")] %}
+<section class="card">
+<h2>{{ title }}</h2>
+{% if rows %}<ul>{% for r in rows %}<li><code>{{ r[col] }}</code> <span class="note">({{ r.created_by }}, {{ r.created_at|t }})</span>
+<form method="post" action="/scope/entries" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="action" value="remove"><input type="hidden" name="value" value="{{ r[col] }}"><button class="secondary">Remove</button></form></li>{% endfor %}</ul>{% else %}<p class="note">None.</p>{% endif %}
+<form method="post" action="/scope/entries" class="row"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="kind" value="{{ kind }}">
+<label>Add <input name="value" required maxlength="300" placeholder="{{ hint }}"></label><button>Add</button></form>
+</section>
+{% endfor %}
+{% endblock %}

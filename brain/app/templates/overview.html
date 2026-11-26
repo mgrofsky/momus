@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock %}
+{% block body %}
+<h1>Overview</h1>
+{% include "_snapshot_state.html" %}
+<section class="grid">
+  <div class="card">
+    <h2>Open findings by band</h2>
+    {% if d.counts %}
+    <ul class="bands">
+      {% for b in ["Critical", "High", "Medium", "Low"] %}<li><span class="band b-{{ b|lower }}">{{ b }}</span> <strong>{{ d.counts[b] }}</strong></li>{% endfor %}
+    </ul>
+    {% else %}<p class="note">No snapshot.</p>{% endif %}
+  </div>
+  <div class="card">
+    <h2>Since the last run</h2>
+    {% if d.latest %}
+    <ul class="plain">
+      <li>New: <strong>{{ d.latest.new }}</strong></li>
+      <li>Reopened: <strong>{{ d.latest.reopened }}</strong></li>
+      <li>Fixed: <strong>{{ d.latest.fixed }}</strong></li>
+    </ul>
+    <p class="note">Run <code>{{ d.latest.run_id }}</code> ({{ d.latest.kind or "full" }}), started {{ d.latest.started|t }}.</p>
+    {% else %}<p class="note">No scored run yet. An inventory run lists hosts; findings come from a full run.</p>{% endif %}
+  </div>
+  <div class="card">
+    <h2>Scanner</h2>
+    {% if d.scanner %}
+    <ul class="plain">
+      <li>State: <strong>{{ d.scanner.state or "unknown" }}</strong>{% if d.scanner.current_job %}, job <code>{{ d.scanner.current_job }}</code>{% endif %}</li>
+      <li>Heartbeat: {{ d.scanner.updated_at|t }}{% if d.scanner.stale %} <span class="tag stale">stale: older than 3 minutes, or dated in the future</span>{% endif %}</li>
+      <li>Templates: {{ d.scanner.templates.count|n }} ({{ d.scanner.templates.source or "unknown source" }}), dated {{ d.scanner.templates.date|t }}</li>
+      <li>Profiles in effect: {{ d.scanner.profiles.check_profile|n }} checks, {{ d.scanner.profiles.rate_profile|n }} rate, {{ d.scanner.profiles.evidence|n }} evidence</li>
+    </ul>
+    {% else %}<p class="note">The scanner has not published a heartbeat (scanner.json). Is it running, with the published volume shared?</p>{% endif %}
+  </div>
+</section>
+
+<section>
+  <h2>Trend</h2>
+  {% if bars %}
+  <svg class="trend" viewBox="0 0 600 120" role="img" aria-label="Findings by band per scored run, oldest on the left">
+    {% for b in bars %}{% for s in b.segs %}<rect class="seg-{{ s.band|lower }}" x="{{ b.x }}" y="{{ s.y }}" width="{{ b.w }}" height="{{ s.h }}"><title>{{ b.run_id }}: {{ s.band }}</title></rect>{% endfor %}{% endfor %}
+  </svg>
+  <p class="note">Each bar is one scored run (from the scanner's stored run summaries), stacked Critical, High, Medium, Low.</p>
+  {% else %}<p class="note">No run summaries yet.</p>{% endif %}
+</section>
+
+<section>
+  <h2>Highest-priority open findings</h2>
+  {% if d.top %}
+  <div class="scroll"><table>
+    <thead><tr><th>Band</th><th>Score</th><th>Finding</th><th>Host</th><th>Source</th><th>Status</th><th>Verdict</th></tr></thead>
+    <tbody>{% for r in d.top %}{% include "_finding_row.html" %}{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="note">No open findings.</p>{% endif %}
+</section>
+{% endblock %}

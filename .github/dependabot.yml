@@ -1,0 +1,31 @@
+# Dependabot version updates. Each pull request it opens must pass the suites in CONTRIBUTING.md before merging.
+#
+# Python packages (pip) are deliberately not listed. brain/requirements.txt, brain/requirements-dev.txt, and
+# seeder/requirements.txt are curated by hand: every line carries why it is there, the hashes cover only the
+# CPython 3.13 Linux wheels for amd64 and arm64, the images install them with --no-deps (so nothing re-checks that a
+# bumped package's own dependencies are still satisfied), and seeder/requirements.txt must equal the brain's lines for
+# the packages they share (seeder/tests/test_seed_dns.py checks this). Dependabot updates one requirements file and one
+# package at a time and does not re-resolve the set, so its pull requests would break those rules. Update the Python
+# packages by hand as CONTRIBUTING.md ("Updating Python packages") describes.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Base images. One grouped pull request for all four, so the brain and the seeder keep the same python digest.
+  # The scanner's FROM line carries a digest without a tag, so Dependabot cannot tell which tag to follow there;
+  # update it as docs/base-image.md describes.
+  - package-ecosystem: "docker"
+    directories:
+      - "/scanner"
+      - "/brain"
+      - "/seeder"
+      - "/demo/target"
+    schedule:
+      interval: "weekly"
+    groups:
+      base-images:
+        patterns:
+          - "*"

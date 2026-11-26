@@ -1,0 +1,8 @@
+[project]
+name = "momus"
+version = "0.1.0"
+description = "External attack-surface scanner for the domains you own"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = []

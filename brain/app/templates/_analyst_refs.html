@@ -1,0 +1,3 @@
+{# References in analyst output: chosen by the model (and checked by the validator against the run's snapshot), so
+   shown as plain text, never as links. #}
+{% macro refs(items) %}{% for r in items %}<code>{{ r.kind }} {{ r.id }}</code>{% if not loop.last %}, {% endif %}{% endfor %}{% endmacro %}

@@ -1,0 +1,22 @@
+# CNAME target suffixes of CDN/WAF edges. A host whose CNAME chain ends here is classed cdn_fronted:
+# web checks (the application behind the edge is yours), no port scan of the shared edge addresses.
+# Your own scope/cdn_cnames.txt is merged with this list. One suffix per line, # comments.
+cloudfront.net        # amazon
+cloudflare.net        # cloudflare
+cdn.cloudflare.net    # cloudflare
+fastly.net            # fastly
+fastlylb.net          # fastly
+akamaiedge.net        # akamai
+akamaized.net         # akamai
+edgekey.net           # akamai
+edgesuite.net         # akamai
+incapdns.net          # imperva
+impervadns.net        # imperva
+azureedge.net         # microsoft
+azurefd.net           # microsoft
+trafficmanager.net    # microsoft
+sucuri.net            # sucuri
+stackpathdns.com      # stackpath
+b-cdn.net             # bunny
+cdn77.org             # cdn77
+llnwd.net             # edgio

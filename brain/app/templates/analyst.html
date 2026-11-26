@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% from "_pager.html" import pager %}
+{% from "_analyst_refs.html" import refs %}
+{% block title %}Analyst{% endblock %}
+{% block body %}
+<h1>Analyst</h1>
+{% include "_flash.html" %}
+<p class="note">The analyst reads scan results and drafts. It cannot start a scan, change the scope, or change any score, verdict or status. The only thing it can write is a proposal, and a person decides each one. Text written by the model is shown below as plain text, labeled as the model's.</p>
+{% if d.state.problem %}
+<div class="empty" role="status"><strong>The analyst is not available.</strong> {{ d.state.problem }}
+{% if d.state.provider == "none" %}<p>To use it, set <code>MOMUS_ANALYST_PROVIDER</code> (anthropic, openai, gemini or bedrock), <code>MOMUS_ANALYST_MODEL</code> and a key (<code>MOMUS_ANALYST_API_KEY</code> or <code>MOMUS_ANALYST_API_KEY_FILE</code>; Bedrock: <code>MOMUS_ANALYST_REGION</code>, key optional), restart the brain, and confirm on the <a href="/settings#analyst">Settings page</a> what will be sent. See <a href="/docs/analyst">the analyst's documentation</a>.</p>{% endif %}
+</div>
+{% else %}
+<p class="note">Provider: {{ d.state.provider_label }}, model <code>{{ d.state.model or "-" }}</code>{% if d.state.metadata_only %}; metadata-only mode is on{% endif %}.</p>
+{% endif %}
+{% set s = d.state %}{% include "partials/analyst_live.html" %}
+
+<section class="card">
+<h2>Run brief</h2>
+{% if not d.state.problem %}
+<form method="post" action="/analyst/brief" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Write a brief now</button></form>
+{% endif %}
+{% set b = d.brief %}
+{% if b %}
+<p class="note">From analyst run <a href="/analyst/runs/{{ b.id }}">{{ b.id }}</a>, {{ b.finished_at|t }}, snapshot of scan run <code>{{ b.scan_run_id or "-" }}</code>.</p>
+{% if b.facts %}
+<h3>What changed (computed by the application from the snapshot)</h3>
+<p>Latest scored run <code>{{ b.facts.run_id or "-" }}</code>{% if b.facts.previous_run_id %}, compared with <code>{{ b.facts.previous_run_id }}</code>{% endif %}:
+<strong>{{ b.facts.counts.new }}</strong> new, <strong>{{ b.facts.counts.reopened }}</strong> reopened, <strong>{{ b.facts.counts.fixed }}</strong> fixed.
+Open now: {% for band, n in b.facts.bands.items() %}{{ band }} {{ n }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>
+{% for label, key in [("New", "new"), ("Reopened", "reopened"), ("Fixed", "fixed")] %}{% if b.facts[key] %}
+<details><summary>{{ label }} ({{ b.facts.counts[key] }})</summary><ul>
+{% for f in b.facts[key] %}<li>{% if f.finding_key is finding_key %}<a href="/findings/{{ f.finding_key }}"><code>{{ f.finding_key }}</code></a>{% else %}<code>{{ f.finding_key }}</code>{% endif %} {{ f.band or "" }} {{ f.hostname or "" }}: {{ f.title or "" }}</li>{% endfor %}
+</ul></details>{% endif %}{% endfor %}
+{% endif %}
+{% if b.result %}
+<h3>Top three (written by the model)</h3>
+{% if b.result.top %}<ol>{% for it in b.result.top %}<li><strong class="pre">{{ it.title }}</strong><div class="pre">{{ it.reason }}</div><div class="note">References: {{ refs(it.references) }}</div></li>{% endfor %}</ol>{% else %}<p class="note">None.</p>{% endif %}
+<h3>Commentary on what changed (written by the model; the counts above are the application's)</h3>
+<div class="pre">{{ b.result.change_commentary or "None." }}</div>
+<h3>Remediation by cause (written by the model)</h3>
+{% if b.result.remediation %}<ul>{% for g in b.result.remediation %}<li><strong class="pre">{{ g.cause }}</strong><div class="pre">{{ g.advice }}</div><div class="note">References: {{ refs(g.references) }}</div></li>{% endfor %}</ul>{% else %}<p class="note">None.</p>{% endif %}
+{% endif %}
+{% if b.dropped %}<p class="note">The validator dropped {{ b.dropped|length }} item(s) that cited something not in the snapshot; see the run.</p>{% endif %}
+{% else %}<p class="note">No brief yet.</p>{% endif %}
+</section>
+
+<section class="card">
+<h2>Proposals waiting for a decision</h2>
+<p class="note">Each proposal has its own page with the finding's stored evidence. There is no accept-all.</p>
+{% if d.pending %}<div class="scroll"><table><thead><tr><th>Proposal</th><th>Kind</th><th>Finding</th><th>Run</th><th>Made</th><th></th></tr></thead><tbody>
+{% for p in d.pending %}<tr><td><a href="/analyst/proposals/{{ p.id }}">{{ p.id }}</a></td><td>{{ p.kind|replace("_", " ") }}</td>
+<td>{% if p.finding_key is finding_key %}<code>{{ p.finding_key }}</code>{% else %}-{% endif %}</td><td><a href="/analyst/runs/{{ p.agent_run_id }}">{{ p.agent_run_id }}</a></td>
+<td>{{ p.created_at|t }}</td><td>{% if p.instruction_warning %}<span class="tag">text addressed to an AI</span>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>{% else %}<p class="note">None.</p>{% endif %}
+{% if d.decided %}<details><summary>Recently decided</summary><ul>{% for p in d.decided %}<li><a href="/analyst/proposals/{{ p.id }}">{{ p.id }}</a> {{ p.kind|replace("_", " ") }}: {{ p.status }} by {{ p.decided_by }}, {{ p.decided_at|t }}</li>{% endfor %}</ul></details>{% endif %}
+</section>
+
+<section class="card">
+<h2>Ask the analyst</h2>
+{% if not d.state.problem %}
+<form method="post" action="/analyst/chat">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label>Question <textarea name="question" rows="3" maxlength="2000" required></textarea></label>
+  <button>Ask</button>
+</form>
+{% endif %}
+{% for ch in d.chats %}
+<div class="card"><p class="note">Run <a href="/analyst/runs/{{ ch.id }}">{{ ch.id }}</a>, {{ ch.started_at|t }}, asked by {{ ch.requested_by }}: {{ ch.status }}{% if ch.outcome and ch.outcome != "ok" %} ({{ ch.outcome_text }}){% endif %}</p>
+<p><strong>Question:</strong></p><div class="pre">{{ ch.question }}</div>
+{% if ch.result %}<p><strong>Answer (written by the model):</strong></p><div class="pre">{{ ch.result.answer }}</div>
+<p class="note">References: {{ refs(ch.result.references) or "none" }}. Tools called: {{ ch.tools|join(", ") or "none" }}.</p>{% endif %}
+</div>
+{% endfor %}
+</section>
+
+<section class="card">
+<h2>Analyst runs</h2>
+{% if d.runs %}<div class="scroll"><table><thead><tr><th>Run</th><th>Kind</th><th>Trigger</th><th>By</th><th>Status</th><th>Steps</th><th>Tokens in / out</th><th>Started</th></tr></thead><tbody>
+{% for r in d.runs %}<tr><td><a href="/analyst/runs/{{ r.id }}">{{ r.id }}</a></td><td>{{ r.kind }}</td><td>{{ r.trigger }}</td><td>{{ r.requested_by or "-" }}</td>
+<td><span class="state s-{{ 'done' if r.status == 'done' else 'running' if r.status == 'running' else 'failed' }}">{{ r.status }}</span>{% if r.outcome and r.outcome != "ok" %}: {{ r.outcome }}{% endif %}</td>
+<td>{{ r.steps }}</td><td>{{ r.tokens_in }} / {{ r.tokens_out }}</td><td>{{ r.started_at|t }}</td></tr>{% endfor %}
+</tbody></table></div>{% else %}<p class="note">No runs yet.</p>{% endif %}
+{{ pager("runs_page", d.runs_page, d.runs_more) }}
+</section>
+{% endblock %}
