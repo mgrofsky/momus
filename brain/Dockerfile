@@ -12,6 +12,7 @@ WORKDIR /opt/brain
 COPY brain/requirements.txt ./requirements.txt
 RUN pip install --require-hashes --no-deps --only-binary=:all: -r requirements.txt
 COPY brain/app ./app
+COPY --chmod=0644 brain/app/static/vendor/htmx-2.0.7.min.js ./app/static/vendor/htmx-2.0.7.min.js
 COPY brain/run.py ./run.py
 # host recovery commands: docker compose exec brain python -B -m tools.admin <command> (run from WORKDIR /opt/brain)
 COPY brain/tools ./tools

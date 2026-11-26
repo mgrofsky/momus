@@ -1,13 +1,17 @@
 <section class="card">
 <h2>Queue a job</h2>
 <p class="note">What leaves this machine during a scan, and to whom: <a href="/docs/data-flows">data flows</a>.</p>
-{% if q.busy %}<p class="flash err" role="status">A job is in flight ({{ q.busy }}). A new job is not queued until it ends: the scanner runs one job at a time.</p>{% endif %}
+{% if q.busy %}<p class="flash err" role="status">A job is already queued or running ({{ q.busy }}). Wait for it to finish before adding another. The scanner runs one job at a time.</p>{% endif %}
 {% if q.why %}<p class="note">{{ q.why }}</p>{% endif %}
-{% if q.forms %}{% for fm in q.forms %}
-<form method="post" action="/jobs" class="inline">
-  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="type" value="{{ fm.type }}">
-  <button{% if not fm.enabled %} disabled{% endif %}>{{ fm.label }}</button>
-</form>
-{% if fm.note %}<span class="note">{{ fm.note }}</span>{% endif %}
-{% endfor %}{% endif %}
+{% if q.forms %}<ul class="queue-list">
+{% for fm in q.forms %}
+  <li class="queue-row">
+    <form method="post" action="/jobs">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="type" value="{{ fm.type }}">
+      <button{% if not fm.enabled %} disabled{% endif %}>{{ fm.label }}</button>
+    </form>
+    {% if fm.note %}<p class="note">{{ fm.note }}</p>{% endif %}
+  </li>
+{% endfor %}
+</ul>{% endif %}
 </section>

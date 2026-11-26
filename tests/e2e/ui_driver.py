@@ -154,7 +154,7 @@ def main():
     s2, _, _ = b.post_form("/runs", "/jobs", {"type": "inventory"})
     _, _, text = b.get("/runs")
     check("ui 3 a second job is not queued while one is in flight, and the page says why",
-          "in flight" in text, s2)
+          "already queued or running" in text, s2)
     st = wait_job(b, inv, 900)
     check("ui 3 inventory job ends done", st and st.get("state") == "done", st)
 

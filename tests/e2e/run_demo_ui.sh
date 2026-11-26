@@ -42,6 +42,9 @@ check "1 the brain runs as uid 10001 with a read-only root filesystem" \
 TOKEN=""; for i in $(seq 1 60); do TOKEN=$(docker logs "$BR" 2>&1 | sed -n 's/^  BOOTSTRAP TOKEN: //p' | tail -1); [ -n "$TOKEN" ] && break; sleep 1; done
 check "1 the brain printed a one-time bootstrap token to its log" "$([ -n "$TOKEN" ]; echo $?)"
 for i in $(seq 1 30); do docker logs "$SC" 2>&1 | grep -q 'runner: started' && break; sleep 1; done
+asset=$(docker exec "$BR" python3 -B -c 'import urllib.request; r = urllib.request.urlopen("http://127.0.0.1:8080/static/vendor/htmx-2.0.7.min.js", timeout=10); body = r.read(); assert len(body) > 10000 and len(body) == int(r.headers.get("Content-Length", "0")) and b"htmx" in body; print(len(body))' 2>&1); rc=$?
+check "1 the browser script downloads in full from the non-root brain" "$rc" "$asset"
+[ "$rc" -eq 0 ] || { echo "SUMMARY: $PASS passed, $FAIL failed"; exit 1; }
 
 echo "== 2-9. drive the brain over HTTP"
 docker run --name momus-e2e-ui-driver --rm --network "${PROJECT}_brain_lab" --read-only --cap-drop ALL --user 10001:10001 \
