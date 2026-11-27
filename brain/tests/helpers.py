@@ -30,7 +30,7 @@ class _Scan(html.parser.HTMLParser):
     def handle_starttag(self, tag, attrs):
         if tag == "script":
             src = dict(attrs).get("src")
-            if src != "/static/vendor/htmx-2.0.7.min.js":
+            if src not in ("/static/vendor/htmx-2.0.7.min.js", "/static/sidebar.js"):
                 self.problems.append(f"script tag {attrs}")
         if tag in ("img", "iframe", "object", "embed", "base", "meta") and tag != "meta":
             self.problems.append(f"{tag} tag")

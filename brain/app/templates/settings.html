@@ -4,9 +4,13 @@
 <h1>Settings</h1>
 {% include "_flash.html" %}
 {% if proxy_warning %}<p class="flash err" role="alert">{{ proxy_warning }}</p>{% endif %}
-<section class="card">
-<h2>Your account</h2>
-<p>Signed in as <strong>{{ user }}</strong> (admin). All accounts are local and have the same admin role in this version.</p>
+<section class="card settings-account">
+<div class="settings-account-intro">
+  <h2>Your account</h2>
+  <p>Signed in as <strong>{{ user }}</strong> (admin). All accounts are local and have the same admin role in this version.</p>
+  <p class="note">Changing the password signs out every other session.</p>
+</div>
+<div class="settings-account-form">
 <h3>Change password</h3>
 <form method="post" action="/settings/password" class="stack">
   <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -15,7 +19,7 @@
   <label>New password again <input type="password" name="new2" required minlength="{{ min_len }}" maxlength="1024" autocomplete="new-password"></label>
   <button>Change password</button>
 </form>
-<p class="note">Changing the password signs out every other session.</p>
+</div>
 </section>
 <section class="card">
 <h2>Sessions</h2>

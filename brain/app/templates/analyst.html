@@ -15,7 +15,7 @@
 {% endif %}
 {% set s = d.state %}{% include "partials/analyst_live.html" %}
 
-<section class="card">
+<section class="analyst-section">
 <h2>Run brief</h2>
 {% if not d.state.problem %}
 <form method="post" action="/analyst/brief" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Write a brief now</button></form>
@@ -45,7 +45,7 @@ Open now: {% for band, n in b.facts.bands.items() %}{{ band }} {{ n }}{% if not 
 {% else %}<p class="note">No brief yet.</p>{% endif %}
 </section>
 
-<section class="card">
+<section class="analyst-section">
 <h2>Proposals waiting for a decision</h2>
 <p class="note">Each proposal has its own page with the finding's stored evidence. There is no accept-all.</p>
 {% if d.pending %}<div class="scroll"><table><thead><tr><th>Proposal</th><th>Kind</th><th>Finding</th><th>Run</th><th>Made</th><th></th></tr></thead><tbody>
@@ -56,7 +56,8 @@ Open now: {% for band, n in b.facts.bands.items() %}{{ band }} {{ n }}{% if not 
 {% if d.decided %}<details><summary>Recently decided</summary><ul>{% for p in d.decided %}<li><a href="/analyst/proposals/{{ p.id }}">{{ p.id }}</a> {{ p.kind|replace("_", " ") }}: {{ p.status }} by {{ p.decided_by }}, {{ p.decided_at|t }}</li>{% endfor %}</ul></details>{% endif %}
 </section>
 
-<section class="card">
+{% if not d.state.problem or d.chats %}
+<section class="analyst-section">
 <h2>Ask the analyst</h2>
 {% if not d.state.problem %}
 <form method="post" action="/analyst/chat">
@@ -73,8 +74,9 @@ Open now: {% for band, n in b.facts.bands.items() %}{{ band }} {{ n }}{% if not 
 </div>
 {% endfor %}
 </section>
+{% endif %}
 
-<section class="card">
+<section class="analyst-section">
 <h2>Analyst runs</h2>
 {% if d.runs %}<div class="scroll"><table><thead><tr><th>Run</th><th>Kind</th><th>Trigger</th><th>By</th><th>Status</th><th>Steps</th><th>Tokens in / out</th><th>Started</th></tr></thead><tbody>
 {% for r in d.runs %}<tr><td><a href="/analyst/runs/{{ r.id }}">{{ r.id }}</a></td><td>{{ r.kind }}</td><td>{{ r.trigger }}</td><td>{{ r.requested_by or "-" }}</td>
