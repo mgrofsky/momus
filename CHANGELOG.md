@@ -6,13 +6,25 @@ All notable changes to this project are recorded in this file. The format follow
 
 ## [Unreleased]
 
+### Added
+
+- Grouped sidebar navigation with a collapse control, an icon-only view, and a saved menu preference. A mobile menu keeps the same destinations available on small screens.
+- An animated scout mark in the application header and sidebar.
+- A localhost-only lab browser bridge, so the demo can be explored through the web UI without giving the scanner or brain an outbound network.
+
+### Changed
+
+- Refreshed the web interface's typography, spacing, colors, and responsive layouts, including the Overview, Runs, Analyst, and Settings pages.
+- Pinned the scanner image's baked nuclei templates to a SHA-256-verified release archive, avoiding the updater's rate-limited build step.
+
 ### Fixed
 
 - The Scope page now shows a new domain's DNS proof record without a reload: the domains list updates itself every few seconds while it waits for the scanner, and shows the record as the separate Type, Name, and Value fields a DNS panel asks for.
+- Browser asset delivery now includes the files used by the refreshed interface.
 
 ## [0.1.0] - 2026-11-25
 
-Initial public release.
+Initial tagged release.
 
 ### Added
 
@@ -24,4 +36,4 @@ Initial public release.
 - Cloud examples: an AWS CloudFormation template and a Google Cloud script for one scanner host.
 
 [Unreleased]: https://github.com/mgrofsky/momus/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/mgrofsky/momus/releases/tag/v0.1.0
+[0.1.0]: https://github.com/mgrofsky/momus/tree/v0.1.0

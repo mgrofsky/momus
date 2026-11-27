@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """ui_driver.py - drives the brain over HTTP for tests/e2e/run_demo_ui.sh, like a browser would (session cookie,
-anti-forgery token from the page, Origin header). Standard library only. Runs in a container on the brain's own
-internal network; it never reaches the scanner or the demo target. Prints PASS/FAIL lines; exit 1 if any failed.
+anti-forgery token from the page, Origin header). Standard library only. Runs on the Docker host through the lab's
+localhost browser bridge; it never reaches the scanner or demo target directly. Prints PASS/FAIL lines; exit 1 if any failed.
 
-  ui_driver.py --base http://brain:8080 --canaries FILE   (BOOTSTRAP_TOKEN in the environment)
+  ui_driver.py --base http://127.0.0.1:18081 --canaries FILE   (BOOTSTRAP_TOKEN in the environment)
 """
 import argparse
 import html

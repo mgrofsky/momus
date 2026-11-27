@@ -34,36 +34,23 @@ License: [MIT](LICENSE). Source: <https://github.com/mgrofsky/momus>.
 
 ## Quick start: the lab demo
 
-The lab demo scans a deliberately weak web server that runs in its own container. Everything runs on internal Docker networks with no route off your machine. It needs Docker with Compose 2.24.4 or newer (tested with v5.7.0; an older Compose cannot parse the project's Compose files), about 5 GB of disk for the images, and the private range `10.89.47.0/24` free on your machine. It needs no model key and no cloud account. Only the image builds use the internet, to download the base images and packages.
+The lab demo scans a deliberately weak web server that runs in its own container. The scanner, web application, and demo target use internal Docker networks with no route off your machine. A small browser bridge makes the web UI available only at `http://127.0.0.1:8080`; it has no mounted files or configured secrets and forwards requests only to the lab web application. It needs Docker Engine 28.0.0 or newer and Compose 2.24.4 or newer (tested with Docker Desktop 29.9.3 and Compose v5.7.0), about 5 GB of disk for the images, and the private range `10.89.47.0/24` free on your machine. [Older Docker engines can expose localhost-published ports to other machines on the same network](https://docs.docker.com/engine/network/port-publishing/#publishing-ports). It needs no model key and no cloud account. The image builds use the internet to download base images and packages. Stop anything already using port 8080 before starting the lab.
 
 Run these commands in the project folder. The first one builds the images, which takes several minutes.
 
 ```sh
-# 1. Build and start the scanner and the demo target in lab mode
-docker compose -f compose.yaml -f compose.lab.yaml up -d --build scanner demo-target
-
-# 2. Record the ownership statement for the lab's domain
-docker compose -f compose.yaml -f compose.lab.yaml run --rm jobctl attest owned.demo.test --by "Your Name"
-
-# 3. Run an inventory: discovery, DNS, and web fingerprinting; no port scan, TLS scan, or templates
-docker compose -f compose.yaml -f compose.lab.yaml run --rm jobctl submit inventory --id demo-inventory --lab-target target.demo.test --lab-target notice.demo.test --lab-cidr 10.89.47.0/24
-docker compose -f compose.yaml -f compose.lab.yaml run --rm jobctl wait demo-inventory
-
-# 4. Approve active checks for what that inventory found
-docker compose -f compose.yaml -f compose.lab.yaml run --rm jobctl approve demo-inventory --by "Your Name"
-
-# 5. Run a full scan (a few minutes)
-docker compose -f compose.yaml -f compose.lab.yaml run --rm jobctl submit full --id demo-full --lab-target target.demo.test --lab-target notice.demo.test --lab-cidr 10.89.47.0/24 --approved-host target.demo.test
-docker compose -f compose.yaml -f compose.lab.yaml run --rm jobctl wait demo-full
-
-# 6. Read the results: job states, then the HTML report and CSV files
-docker compose -f compose.yaml -f compose.lab.yaml run --rm jobctl status
-docker compose -f compose.yaml -f compose.lab.yaml cp scanner:/srv/published/reports ./demo-reports
+docker compose -f compose.yaml -f compose.lab.yaml up -d --build scanner brain demo-target ui-proxy
+docker compose -f compose.yaml -f compose.lab.yaml logs brain
 ```
 
-Each `wait` prints the job's final status. `"state": "done"` means it finished; `"findings_open"` counts what the full scan found. Open `demo-reports/demo-full/demo-full.html` in a browser. The status also lists the lab's domain as `pending`: its DNS record does not exist, so nothing is sent to it, and only the lab targets are scanned.
+The log shows a one-time bootstrap token. Open `http://127.0.0.1:8080/bootstrap`, paste the token, and create the first account. Then use the web pages:
 
-`jobctl` is a small developer tool that writes job files and reads results, as the brain does. In lab mode the brain has no published port, so the demo uses `jobctl` instead of the web pages. `tests/e2e/run_demo_ui.sh` drives the same lab through the brain's pages.
+1. On **Scope**, add `target.demo.test` and `notice.demo.test` one at a time. Keep **Kind** set to **lab target (demo network only)** and confirm the ownership statement for each. Lab targets need no public DNS record.
+2. On **Runs**, queue an **inventory**. It discovers the two lab hosts and does web fingerprinting. Wait for the job to show **done**.
+3. On **Scope**, expand **Review inventory** and check the hosts and addresses, then click **Approve after review**. Under **Approved hosts (port scans allowed)**, add `target.demo.test` if you want the full lab check to include port scans of that target.
+4. On **Runs**, queue a **full** run and wait for **done**. Open **Findings**, **Assets**, and **Runs** to explore the results and download the report. The lab banner confirms that these are demo results.
+
+The UI bridge publishes to `127.0.0.1` only. The scanner, brain, and demo target have no published ports, and the brain still has no network shared with the scanner. The bridge is the only lab container with a host-facing network; that network has an outbound route, although the bridge only connects to the brain. The optional analyst uses a built-in mock provider and sends nothing to a model service. For an automated walkthrough of the same web flow, run `tests/e2e/run_demo_ui.sh` on a fresh lab; its driver uses HTTP and does not test rendered layout.
 
 When you are done, remove the lab's containers, networks, and volumes:
 

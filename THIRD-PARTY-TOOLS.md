@@ -15,8 +15,10 @@ templates during the same build. Compose builds every image from this repository
 Momus image.
 
 The brain and the seeder install their Python packages from PyPI during your build, with exact versions and hashes
-(`pip install --require-hashes`). The repository itself contains two third-party works: htmx, a small JavaScript
-library, with its license beside it, and the Comic Shanns font embedded in the data flow diagram (below).
+(`pip install --require-hashes`). The lab UI bridge uses the same digest-pinned Python base as the brain and only
+the Python standard library; it installs no additional package. The repository itself contains two third-party works:
+htmx, a small JavaScript library with its license beside it, and the Comic Shanns font embedded in the data flow diagram
+(below).
 
 ## Comic Shanns font
 
@@ -111,13 +113,16 @@ Cymru's whois service.
 
 ## Nuclei templates
 
-The nuclei templates are not part of this repository. The scanner image build runs `nuclei -update-templates`, which
-downloads the template set with nuclei's own updater into `/home/scanner/.local/nuclei-templates` in the image. The
-template set is not pinned: each build downloads whatever version is current that day, so two builds can hold
-different templates. A scan
-never updates them. An `update-templates` job downloads a newer set into the scanner's data volume
-(`$SCAN_ROOT/templates`), and `scanner/update-templates.sh` updates the image's own copy in an interactive container.
-Either way, the download is made by your build or your job, from your machine.
+The nuclei templates are not part of this repository. The scanner image build downloads ProjectDiscovery's
+[v10.5.3 tagged archive](https://github.com/projectdiscovery/nuclei-templates/releases/tag/v10.5.3), checks its
+SHA-256 against `6a4b0670b52c5186391ed41bbe26de5f14a682aa7dc37aa9bec6e896accf2be5` from the release's
+`nuclei-templates-10.5.3_checksums.txt`, and installs it into `/home/scanner/.local/nuclei-templates` in the image.
+The version and digest are pinned in `scanner/Dockerfile`; a rebuild uses those same bytes, or fails if the download
+changes. To bake in a newer set, update both values from a newer ProjectDiscovery release and rebuild the image.
+A scan never updates templates. An `update-templates` job can download a newer set into the scanner's data volume
+(`$SCAN_ROOT/templates`), and `scanner/update-templates.sh` can update the image's own copy in an interactive
+container. Those optional updates still use nuclei's updater and are not pinned to the image's version. The download
+is made by your build or job, from your machine.
 
 The template set carries its own license file, `/home/scanner/.local/nuclei-templates/LICENSE.md` in the image. Its
 first line reads "MIT License" and its copyright line names ProjectDiscovery, Inc. The template version in your image

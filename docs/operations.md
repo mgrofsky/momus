@@ -96,7 +96,7 @@ The scanner's `FROM` line pins the Kali base image by digest. Kali is a rolling 
 A scan never updates the templates. There are two ways to get newer ones:
 
 - **An `update-templates` job.** On the Runs page, "Update the scanner's templates" queues one. The scanner downloads the template set from the internet through its egress firewall into its data volume, and switches to it only when the download finished and holds more than 1,000 templates; otherwise the job fails and the earlier set stays in use. Once such a job has succeeded, that downloaded set is used in preference to the set baked into the image, also after you rebuild the image; queue another `update-templates` job to refresh it. The Overview page shows the template count, the source ("update-templates job" or "baked into the image"), and the date.
-- **A rebuild of the scanner image** without cache (`docker build --no-cache -t momus-scanner scanner/`) bakes in the current set.
+- **A rebuild of the scanner image** without cache (`docker build --no-cache -t momus-scanner scanner/`) bakes in the version pinned in `scanner/Dockerfile`. To bake in a newer set, update both the version and SHA-256 there from the [ProjectDiscovery release](https://github.com/projectdiscovery/nuclei-templates/releases) and its checksum file before rebuilding.
 
 `scanner/update-templates.sh` updates the image's own copy inside a throwaway container with a writable filesystem and network access:
 

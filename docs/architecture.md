@@ -71,11 +71,12 @@ Compose defines a developer tool, `jobctl` (profile `dev`), a stand-in for the b
 
 ### Lab mode and the demo target
 
-`compose.lab.yaml` is an extra Compose file, never loaded by the plain `docker compose up`. It runs under its own project name (`momus-lab`), so its volumes and networks are separate from those of a real scanner. Every network in it is internal, with no route off the machine.
+`compose.lab.yaml` is an extra Compose file, never loaded by the plain `docker compose up`. It runs under its own project name (`momus-lab`), so its volumes and networks are separate from those of a real scanner. The scanner, brain, and demo target use internal networks with no route off the machine. The browser bridge alone joins a host-facing network.
 
 - **Demo target** (`demo-target`): a deliberately weak web server (`demo/target/server.py`) on port 80 with invented weaknesses for the scanner to find. It runs as uid 10002 (the image's own user), with a read-only root filesystem, all capabilities dropped, and no-new-privileges. It sits on the internal network `lab` (`10.89.47.0/24`) at `10.89.47.10`, under the names `target.demo.test` and `notice.demo.test`. Its base image is pinned by digest (`demo/target/Dockerfile`).
 - **Scanner in lab mode:** moved to the `lab` network at `10.89.47.2`, with `SCAN_LAB=1` and `SCAN_LAB_CIDR=10.89.47.0/24`. The firewall additionally allows that one range. The runner accepts lab fields in a job only in this mode and only with this same range.
-- **Brain in lab mode:** on the internal network `brain_lab`, with no published port, `MOMUS_LAB=1`, and the analyst set to the `mock` test provider, overriding anything in `.env`.
+- **Brain in lab mode:** on the internal network `brain_lab`, with no published port and no network shared with the scanner. `MOMUS_LAB=1`, and the analyst is set to the `mock` test provider, overriding anything in `.env`.
+- **Browser bridge** (`ui-proxy`): forwards local browser requests, including login data and cookies, to `brain:8080` over `brain_lab`. Its port is published to the host's `127.0.0.1:8080` only. It has a separate host-facing network, no mounted files or configured secrets, a read-only root filesystem, and no Linux capabilities. Its fixed upstream makes it incapable of acting as a general forward proxy.
 
 ## The two folders
 

@@ -526,8 +526,9 @@ That file is never loaded by a plain `docker compose up`. It uses its own projec
 from real scan data.
 
 **The fixed lab subnet** is 10.89.47.0/24. The scanner is at 10.89.47.2 and the demo target at 10.89.47.10, with the
-names `target.demo.test` and `notice.demo.test`. Every network in the lab project is internal: none has a route off
-the machine. Docker's resolver in the scanner answers the lab names itself and sends every other question to
+names `target.demo.test` and `notice.demo.test`. The scanner, brain, and demo target use internal networks with no route
+off the machine. The browser bridge is the only lab service on a host-facing network; it publishes to `127.0.0.1`
+and forwards requests only to the brain. Docker's resolver in the scanner answers the lab names itself and sends every other question to
 10.89.47.53, an unused lab address, where nothing answers. Any lab range must be private and no larger than a /24.
 
 **What it changes:**

@@ -5,3 +5,9 @@ services:
   brain:
     environment:
       MOMUS_ANALYST_MOCK_RECORD: /tmp/analyst-prompts.jsonl
+      MOMUS_ALLOWED_ORIGINS: http://127.0.0.1:18081,http://localhost:18081,http://brain:8080
+  ui-proxy:
+    # The real Momus instance may already use 8080 on a developer's machine.
+    # The host-side HTTP driver uses this separate localhost port for POSTs too.
+    ports: !override
+      - "127.0.0.1:18081:8080"

@@ -5,7 +5,7 @@
 # when the download holds a real template set). This script updates the image's own copy and is meant for an
 # interactive container with a writable filesystem and network access:
 #   docker run --rm -it --user 10001 --entrypoint /app/scanner/update-templates.sh momus-scanner
-# To keep an update in the image, rebuild it instead: docker build --no-cache -t momus-scanner scanner/
+# To bake a newer set into the image, update the version and SHA-256 in scanner/Dockerfile, then rebuild.
 set -eu
 : "${HOME:?HOME must be set}"
 nuclei -update-templates -nc

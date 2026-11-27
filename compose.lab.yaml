@@ -9,8 +9,10 @@
 # file that is never auto-loaded (it is not named compose.override.yaml) keeps lab mode out of the plain
 # `docker compose up` entirely, and its own project name keeps lab data out of real scan data.
 #
-# Every network here is internal (no route off the machine). The scanner's firewall allows SCAN_LAB_CIDR only
-# because SCAN_LAB=1; the runner accepts lab fields in a job only in this mode and only with this same range.
+# The scanner, brain, and demo target stay on internal networks, with no route off the machine. A separate browser
+# bridge has the only host-facing network and forwards requests to the brain, which remains on its internal network.
+# The scanner's firewall allows SCAN_LAB_CIDR only because SCAN_LAB=1; the runner accepts lab fields in a job only
+# in this mode and only with this same range.
 name: momus-lab
 
 services:
@@ -33,7 +35,10 @@ services:
     environment:
       MOMUS_LAB: "1"
       MOMUS_LAB_CIDR: 10.89.47.0/24
-      MOMUS_ALLOWED_ORIGINS: http://brain:8080   # lab: the browser (or tests/e2e/ui_driver.py) reaches it on brain_lab
+      MOMUS_ALLOWED_ORIGINS: http://127.0.0.1:8080,http://localhost:8080,http://brain:8080
+      MOMUS_PORT: "8080"
+      MOMUS_COOKIE_SECURE: "0"         # lab UI uses HTTP on localhost, even if .env configures a TLS proxy
+      MOMUS_TRUSTED_PROXY: ""           # do not trust forwarded client-address headers from the browser bridge
       # The analyst in lab mode: only the test providers work (the brain has no route out), so the lab uses the mock.
       # These lines override anything an optional .env sets, so a real provider or key from .env never reaches the lab
       # brain. The mock records no prompt here; tests/e2e/run_demo_ui.sh adds tests/e2e/compose.ui-e2e.yaml for that.
@@ -47,9 +52,26 @@ services:
       MOMUS_ANALYST_DEBUG: "0"
       MOMUS_ANALYST_MOCK_RECORD: ""
       MOMUS_ANALYST_PROXY: ""
-    ports: !reset []                  # lab mode: no published port (the network is internal); tests drive it from inside
+    ports: !reset []                  # Docker does not publish ports from an internal-only network; ui-proxy handles it
     networks: !override
       brain_lab: {}
+    restart: "no"
+
+  ui-proxy:
+    build:
+      context: ./demo
+      dockerfile: proxy/Dockerfile
+    image: momus-lab-ui-proxy
+    user: "10001:10001"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    ports:
+      - "127.0.0.1:8080:8080"       # the only published lab port; no scanner or demo-target port is published
+    networks:
+      - brain_lab                   # one fixed upstream: brain:8080
+      - browser_bridge             # host-facing bridge; no app data or credentials are mounted here
+    depends_on: [brain]
     restart: "no"
 
   demo-target:
@@ -79,3 +101,4 @@ networks:
     ipam:
       config:
         - subnet: 10.89.47.0/24
+  browser_bridge: {}               # only ui-proxy joins this network

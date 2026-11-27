@@ -2,7 +2,7 @@
 
 This page says who can attack a Momus install, what each attacker controls, what the design stops, the test that shows each control, and what each attacker can still do. The "What it can still do" lists are the part to read first if you are deciding whether to run Momus. How each control behaves, and what an operator has to do about it, is on the page of the feature it belongs to.
 
-Momus has three containers. The **scanner** sends the scan traffic. The **brain** is the web application: the user interface, the API, the scheduler, and the optional AI **analyst**. The optional **seeder** collects host names from your own DNS services. The scanner and the brain share no network. They exchange files only: the brain writes **jobs** (one JSON file per job) into the `jobs` folder, and the scanner writes results into the **published folder** (`published/`), which the brain reads. The seeder writes a list of host names that the scanner reads; from the scanner it reads only the list of verified domains.
+Momus has two core containers. The **scanner** sends the scan traffic. The **brain** is the web application: the user interface, the API, the scheduler, and the optional AI **analyst**. The optional **seeder** collects host names from your own DNS services. Lab mode adds a demo target and a small local browser bridge. The scanner and the brain share no network. They exchange files only: the brain writes **jobs** (one JSON file per job) into the `jobs` folder, and the scanner writes results into the **published folder** (`published/`), which the brain reads. The seeder writes a list of host names that the scanner reads; from the scanner it reads only the list of verified domains.
 
 The one rule: only the scanner sends packets to scan targets, and only the brain talks to a model provider. The seeder is the one exception to the first half. It contacts the DNS services you configure, such as a zone's own name server, and that server can be a host in scope.
 
@@ -47,7 +47,7 @@ Suppose an attacker controls the scanner container. They control everything unde
 What the design stops, and the test that shows it:
 
 - The scanner mounts the `jobs` folder read-only (`compose.yaml`). No automated test checks this mount.
-- The scanner and the brain share no network, and the brain's port is published on the host's loopback address only. Test: `tests/e2e/run_demo_ui.sh` check "the brain and the scanner share no network".
+- The scanner and the brain share no network. In normal mode the brain's port is published on host loopback; in lab mode the brain has no published port and the browser bridge publishes to loopback only. Tests: `tests/e2e/run_demo_ui.sh` checks "the brain and the scanner share no network" and "the lab web UI is published only on the host loopback address".
 - After start-up, every scanner process runs without capabilities and cannot list or change the firewall. Test: `tests/e2e/run_demo.sh` check "after the drop, a scanner process cannot change the rules".
 - A snapshot whose bytes do not match its recorded SHA-256 hash is refused, and snapshots are opened read-only. Test: `brain/tests/test_snapshot.py::test_hash_mismatch_is_refused`.
 - A snapshot that holds a view, a trigger, a virtual table, a generated column, or an unexpected table shape is refused, and the refusal is remembered. Test: `brain/tests/test_snapshot_safety.py::test_recursive_view_named_as_a_table_the_brain_reads_is_refused`.
@@ -73,7 +73,7 @@ What it can still do:
 
 ## A person on the network who is not signed in
 
-This attacker can send requests to the brain's port, with any username, password, headers (including `X-Forwarded-For`) and any source address they control. By default the port is published on `127.0.0.1` only, so this attacker must already be on the host or reach it through a proxy you set up.
+This attacker can send requests to the brain's port, with any username, password, headers (including `X-Forwarded-For`) and any source address they control. By default the port is published on `127.0.0.1` only, so this attacker must already be on the host or reach it through a proxy you set up. In lab mode the browser bridge is the only published port; it binds to `127.0.0.1` and forwards to the internal brain. Docker Engine 28.0.0 or newer is needed for that localhost-only boundary on the host network.
 
 What the design stops, and the test that shows it:
 

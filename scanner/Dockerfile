@@ -26,16 +26,13 @@ USER scanner
 ENV HOME=/home/scanner
 WORKDIR /home/scanner
 # Templates are part of the image; a scan never updates them. Update with an update-templates job or a rebuild.
-# The download sometimes returns nothing (the publisher's rate limit), so it is tried up to three times; the build
-# fails unless more than 1000 templates are present.
-RUN n=0; for attempt in 1 2 3; do \
-      nuclei -update-templates -nc || true; \
-      tdir=$(python3 -I -B -c 'import json,os; print(json.load(open(os.path.expanduser("~/.config/nuclei/.templates-config.json")))["nuclei-templates-directory"])' 2>/dev/null || true); \
-      n=$(if [ -n "$tdir" ] && [ -d "$tdir" ]; then find "$tdir" -name '*.yaml' | wc -l; else echo 0; fi); \
-      echo "nuclei templates: $n in ${tdir:-no folder} (attempt $attempt)"; \
-      if [ "$n" -gt 1000 ]; then break; fi; \
-      if [ "$attempt" -lt 3 ]; then sleep 20; fi; \
-    done; test "$n" -gt 1000
+# The tagged archive uses GitHub's static download path instead of nuclei's rate-limited release lookup.
+# SHA-256 comes from ProjectDiscovery's v10.5.3 release checksum file. Update the version and hash together.
+COPY --chown=root:root --chmod=0755 install-templates.sh /usr/local/bin/momus-install-templates
+RUN momus-install-templates 10.5.3 6a4b0670b52c5186391ed41bbe26de5f14a682aa7dc37aa9bec6e896accf2be5
+# The production scanner is read-only. Let nuclei create its local config files during the build, without network,
+# so a scan never needs to write under /home/scanner. Validation also catches incompatible template syntax.
+RUN --network=none nuclei -validate -t /home/scanner/.local/nuclei-templates/http/exposures/configs/git-config.yaml -duc -ni -nc
 
 # Firewall tool for the entrypoint (its own layer, so the tool and template layers above stay cached).
 USER root
