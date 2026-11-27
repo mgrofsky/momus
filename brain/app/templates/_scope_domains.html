@@ -1,19 +1,6 @@
 <section class="card">
 <h2>Domains{% if d.lab %} and lab targets{% endif %}</h2>
-{% if d.notice %}<p class="flash err" role="alert">{{ d.notice }}</p>{% endif %}
-{% if d.domains %}
-<div class="scroll"><table><thead><tr><th>Name</th><th>Ownership statement</th><th>Scanner's verification</th><th>TXT record to publish</th><th></th></tr></thead><tbody>
-{% for x in d.domains %}<tr>
-<td><code>{{ x.name }}</code>{% if x.kind == "lab" %} (lab target){% endif %}</td>
-<td>"{{ x.statement }}" — {{ x.attested_by }}, {{ x.attested_at|t }}</td>
-<td>{% if x.kind == "lab" %}not checked: lab targets are only scanned in lab mode, on the lab network{% elif x.published %}<strong>{{ x.published.state or "unknown" }}</strong>{% if x.published.last_result %} (last result: {{ x.published.last_result }}){% endif %}; last check {{ x.published.last_checked_at|t }}{% if x.published.token_reset %}; the token changed ({{ x.published.token_reset }}){% endif %}{% else %}waiting for the scanner{% endif %}{% if x.held_back %}<br><strong>Held back:</strong> {{ x.held_back }}{% endif %}</td>
-<td>{% if x.kind == "lab" %}-{% elif x.published and x.published.txt_name %}<code>{{ x.published.txt_name }}. IN TXT "{{ x.published.txt_value }}"</code>{% else %}waiting for the scanner to publish it (a scope-sync job){% endif %}</td>
-<td><form method="post" action="/scope/domains/remove" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="name" value="{{ x.name }}"><button class="secondary">Remove</button></form></td>
-</tr>{% endfor %}</tbody></table></div>
-{% else %}<p class="note">Nothing in scope yet.</p>{% endif %}
-{% if d.domain_counts %}<p class="note">Latest full run or recheck (<code>{{ d.domain_counts.job_id }}</code>): {{ d.domain_counts.scanned }} domain(s) scanned, {{ d.domain_counts.held_back }} held back because they were added after the approved inventory, {{ d.domain_counts.pending }} pending (not verified, nothing sent to them).</p>{% endif %}
-<p class="note">The verification state and the TXT record come from the scanner (<code>scope_status.json</code>{% if d.scope_status_at %}, updated {{ d.scope_status_at|t }}{% endif %}). The scanner makes the token; the brain never stores it and never decides that a domain is verified. The scanner checks the record at the start of every run.</p>
-{% if d.sync_pending %}<p class="note">A scope sync is waiting: it is queued as soon as no job is in flight.</p>{% endif %}
+{% include "partials/scope_domains_live.html" %}
 <form method="post" action="/scope/check-now" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary">Check DNS proof now</button></form>
 
 <h3>Add {% if d.lab %}a domain or lab target{% else %}a domain{% endif %}</h3>

@@ -71,7 +71,9 @@ again whenever it is needed.
 - The token is tied to one install and one domain. Publishing the record of a different domain, or one made by a
   different install, proves nothing.
 - The scanner publishes, for each domain, the exact record to create in `scope_status.json` in the published folder.
-  The Scope page shows it. The record is public once you publish it in DNS; the secret is not.
+  The Scope page shows it as the separate Type, Name, and Value fields a DNS panel asks for, with the zone-file line
+  below them. Right after a domain is added, the page updates on its own every few seconds until the scanner has
+  published the record (no reload needed). The record is public once you publish it in DNS; the secret is not.
 - If the install secret is lost and replaced, every token changes: each domain goes back to `pending`, and
   `scope_status.json` carries a notice.
 

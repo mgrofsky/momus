@@ -56,6 +56,29 @@ def test_pages_with_hostile_data_listed(admin, published):
         assert "&lt;script&gt;alert(" in r.text, path
 
 
+def test_scope_record_block_escapes_or_drops_hostile_values(admin, published, settings):
+    """The DNS record block on the Scope page and its live fragment: a hostile txt_value is shown escaped in every
+    place it appears (Value, zone-file line), and a txt_name that is not a host name is dropped (no record shown)."""
+    for name in ("example.test", "other.test"):
+        r = admin.post("/scope/domains", data={"name": name, "statement": "yes", "kind": "domain"})
+        assert r.status_code == 303 and "err=" not in r.headers["location"]
+    path = os.path.join(settings.published_dir, "scope_status.json")
+    doc = json.load(open(path))           # example.test: a valid name with the hostile value (fixtures.build_published)
+    doc["domains"]["other.test"] = {"state": "pending", "txt_name": fixtures.HOSTILE, "txt_value": "scan-verify=" + "0f" * 16}
+    json.dump(doc, open(path, "w"))
+    for p in ("/scope", "/scope/live"):
+        r = admin.get(p)
+        assert r.status_code == 200, p
+        common_headers(r)
+        assert live_problems(r.text) == [], (p, live_problems(r.text)[:5])
+        assert "<script>alert" not in r.text and "<img src=x" not in r.text, p
+        assert "<dt>Value</dt><dd><code>scan-verify=&lt;script&gt;alert(&#39;momus-xss&#39;)&lt;/script&gt;" in r.text, p
+        assert r.text.count("&lt;script&gt;alert(&#39;momus-xss&#39;)") >= 2, p      # Value and the zone-file line
+        assert "<dt>Name</dt><dd><code>_scan-verify.example.test</code>" in r.text, p
+        assert "DNS record to publish for <code>other.test</code>" not in r.text, p  # its name failed validation
+        assert "0f" * 16 not in r.text, p
+
+
 def test_every_api_route_escapes_hostile_data(app, admin, published):
     shown = 0
     for method, tmpl, path in routes(app):

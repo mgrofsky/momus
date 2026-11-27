@@ -6,6 +6,10 @@ All notable changes to this project are recorded in this file. The format follow
 
 ## [Unreleased]
 
+### Fixed
+
+- The Scope page now shows a new domain's DNS proof record without a reload: the domains list updates itself every few seconds while it waits for the scanner, and shows the record as the separate Type, Name, and Value fields a DNS panel asks for.
+
 ## [0.1.0] - 2026-11-25
 
 Initial public release.

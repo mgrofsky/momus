@@ -3,8 +3,8 @@
 # Docker networks only. A driver (tests/e2e/ui_driver.py) runs in a container on the brain's own internal network
 # and uses the brain over HTTP like a browser: bootstrap an admin, add the lab targets, queue an inventory job,
 # approve the inventory, queue a full job, wait, then check the findings, the analyst (mock provider: a brief, a
-# proposal accepted into a mark, no canary in any recorded prompt), the canaries, the escaped script-tag title
-# and the audit log. Cleans up everything it created. Run it on its own (not at the same time as run_demo.sh: both
+# proposal accepted into a mark, no canary in any recorded prompt), the canaries, the escaped script-tag title,
+# the audit log, and a domain added last whose DNS proof record the Scope page's live part shows once published. Cleans up everything it created. Run it on its own (not at the same time as run_demo.sh: both
 # use the lab range 10.89.47.0/24).
 #   tests/e2e/run_demo_ui.sh
 set -u

@@ -151,6 +151,9 @@ def scope_page(c):
     doms = scopem.domains(c.db)
     for d in doms:
         d["published"] = (ss or {}).get("domains", {}).get(d["name"]) if ss else None
+        # the part of the record name before the domain, which most DNS panels ask for (e.g. "_scan-verify")
+        tn = (d["published"] or {}).get("txt_name")
+        d["txt_short"] = tn[:-len(d["name"]) - 1] if tn and tn.endswith("." + d["name"]) else None
     appr = scopem.approval(c.db)
     out = {"domains": doms, "scope_status_at": ss["updated_at"] if ss else None, "notice": ss["notice"] if ss else None,
            **scopem.lists(c.db), "profile": scopem.profile(c.db), "approval": appr, "approvable": jobs.approvable(c)[:5],
@@ -183,7 +186,19 @@ def scope_page(c):
             if r["hostname"] in awaiting:
                 awaiting[r["hostname"]]["class"] = r.get("class")
     out["awaiting"] = sorted(awaiting.values(), key=lambda x: x["hostname"])
+    out["refresh"] = scope_waiting(c, doms, out["sync_pending"])
     return out
+
+
+def scope_waiting(c, doms, sync_pending):
+    """True while the Scope page waits on the scanner: a domain (not a lab target) has no published TXT record yet, a
+    scope sync is pending, or the job in flight is a scope-sync job (after "Check DNS proof now"). The domains card
+    refreshes itself only then."""
+    from . import jobs
+    if sync_pending or any(d["kind"] != "lab" and not (d["published"] or {}).get("txt_name") for d in doms):
+        return True
+    busy = jobs.in_flight(c.settings, c.scanner)
+    return bool(busy and busy.startswith(jobs.PREFIX["scope-sync"] + "-"))
 
 
 def latest_domain_counts(pub):

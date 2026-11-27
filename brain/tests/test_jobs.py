@@ -169,7 +169,7 @@ def test_one_job_at_a_time(admin, settings):
     loc = queue(admin, "inventory")
     assert "err=" in loc and "in flight" in said(loc)
     page = admin.get("/runs").text
-    assert "A job is in flight" in page and sync[:-5] in page
+    assert "A job is already queued or running" in page and sync[:-5] in page
     finish(settings, sync[:-5], "running", "scope-sync")
     assert "err=" in queue(admin, "inventory")
     finish(settings, sync[:-5], "done", "scope-sync")
@@ -226,6 +226,81 @@ def test_scope_page_shows_record_from_scanner_only(admin, settings):
     page = admin.get("/scope").text
     assert '_scan-verify.example.test. IN TXT "scan-verify=' + "0f" * 16 + '"' in page
     assert "<strong>pending</strong>" in page and "mismatch" in page
+
+
+REFRESH = 'hx-get="/scope/live"'
+TOKEN = "0f" * 16
+
+
+def write_scope_status(settings, state="pending", name="example.test"):
+    os.makedirs(settings.published_dir, exist_ok=True)
+    with open(os.path.join(settings.published_dir, "scope_status.json"), "w") as fh:
+        json.dump({"schema": "momus-scope-status-v1", "updated_at": "2030-01-01T00:00:00Z", "notice": None, "domains": {
+            name: {"state": state, "txt_name": "_scan-verify." + name, "txt_value": "scan-verify=" + TOKEN,
+                   "last_checked_at": "2030-01-01T00:00:00Z", "last_result": "ok" if state == "verified" else "missing"}}}, fh)
+
+
+def live_part(page):
+    """The element the Scope page refreshes: from its opening tag to the "Check DNS proof now" form after it."""
+    start = page.index('<div id="scope-domains-live"')
+    return page[start:page.index('action="/scope/check-now"', start)]
+
+
+def test_scope_page_refreshes_itself_until_the_record_is_published(admin, settings):
+    # the page as drawn right after "Add": the domain is in the database, the scanner has not published its record
+    add_domain(admin)
+    page = admin.get("/scope").text
+    live = live_part(page)
+    assert REFRESH in live and 'hx-trigger="every 3s"' in live
+    assert "this page updates on its own" in live
+    assert "waiting for the scanner to publish it (a scope-sync job)" not in page
+    # the add form and "Check DNS proof now" are outside the refreshed element, so a refresh never wipes typing
+    assert 'action="/scope/domains"' not in live and 'action="/scope/check-now"' not in live
+    assert page.index('action="/scope/domains"') > page.index('action="/scope/check-now"')
+    # the scanner publishes; the next poll of the fragment shows the record the way a DNS panel asks for it
+    finish_all(settings)
+    write_scope_status(settings)
+    r = admin.get("/scope/live", headers={"HX-Request": "true"})
+    assert r.status_code == 200
+    frag = r.text
+    assert frag.lstrip().startswith('<div id="scope-domains-live"') and "<html" not in frag
+    assert "<dt>Type</dt><dd><code>TXT</code></dd>" in frag
+    assert "<dt>Name</dt><dd><code>_scan-verify.example.test</code>" in frag
+    assert "<code>_scan-verify</code>" in frag                                    # the short name
+    assert f"<dt>Value</dt><dd><code>scan-verify={TOKEN}</code></dd>" in frag
+    assert f'_scan-verify.example.test. IN TXT "scan-verify={TOKEN}"' in frag      # the zone-file line, secondary
+    assert REFRESH not in frag and "hx-trigger" not in frag
+    assert 'action="/scope/domains"' not in frag
+
+
+def test_scope_live_is_refused_without_a_session(app, settings):
+    b = Browser(app)
+    for path in ("/scope", "/scope/live"):
+        r = b.c.get(path)
+        assert r.status_code == 303 and r.headers["location"].startswith("/login"), path
+        r = b.c.get(path, headers={"HX-Request": "true"})
+        assert r.status_code == 401 and r.headers.get("hx-redirect") == "/login", path
+        assert "scope-domains-live" not in r.text
+
+
+def test_settled_scope_page_makes_no_background_requests(admin, settings):
+    add_domain(admin)
+    finish_all(settings)
+    write_scope_status(settings, "verified")
+    page = admin.get("/scope").text
+    assert REFRESH not in page and "hx-trigger" not in live_part(page)
+    assert "<dt>Type</dt>" not in page                         # a verified domain needs no record block
+    assert f'_scan-verify.example.test. IN TXT "scan-verify={TOKEN}"' in page
+
+
+def test_scope_page_refreshes_while_check_now_runs(admin, settings):
+    add_domain(admin)
+    finish_all(settings)
+    write_scope_status(settings, "verified")
+    assert admin.post("/scope/check-now").status_code == 303
+    assert REFRESH in admin.get("/scope").text                 # the scope-sync job is in flight
+    finish_all(settings)
+    assert REFRESH not in admin.get("/scope").text             # its status is final: the answer is in
 
 
 def test_approval_needs_a_finished_inventory_of_this_mode(admin, settings):

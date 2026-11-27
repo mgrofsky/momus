@@ -297,6 +297,28 @@ def main():
         check(f"ui 9 audit log has {n} '{act}' entr{'y' if n == 1 else 'ies'}", acts.count(act) == n, acts.count(act))
     check("ui 9 audit log has the queued jobs (inventory and full, plus scope syncs)", acts.count("job-queue") >= 2, acts.count("job-queue"))
     check("ui 9 audit log recorded the refused second job", "job-refused" in acts)
+
+    # 9b. add a domain (it needs the DNS proof), then poll the Scope page's live part as the page itself does, until
+    # the scanner's scope-sync job has published the record. Last, so the counts above are not changed by it.
+    dom = "proof.example.test"
+    check("ui 9b no job in flight before adding a domain", wait_idle(b))
+    s, h, _ = b.post_form("/scope", "/scope/domains", {"name": dom, "statement": "yes", "kind": "domain"})
+    check(f"ui 9b domain {dom} added with the ownership statement", s == 303 and "err=" not in h.get("Location", ""), h.get("Location"))
+    _, _, text = b.get("/scope")
+    check("ui 9b the Scope page drawn right after the add polls its live part while it waits",
+          'hx-get="/scope/live"' in text and "this page updates on its own" in text)
+    deadline, frag, polls = time.time() + 300, "", 0
+    while time.time() < deadline:
+        s, _, frag = b.req("GET", "/scope/live", headers={"HX-Request": "true"})
+        polls += 1
+        if s == 200 and "<dt>Type</dt>" in frag and 'hx-get="/scope/live"' not in frag:
+            break
+        time.sleep(3)
+    short = "_scan-verify"
+    check(f"ui 9b polling the live part shows the record as Type, Name and Value, then stops polling ({polls} polls)",
+          "<dt>Type</dt><dd><code>TXT</code></dd>" in frag and f"<code>{short}.{dom}</code>" in frag
+          and f"<code>{short}</code>" in frag and "<dt>Value</dt><dd><code>scan-verify=" in frag
+          and 'hx-get="/scope/live"' not in frag and "<html" not in frag, frag[-400:])
     return 0 if all(results) else 1
 
 

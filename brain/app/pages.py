@@ -363,6 +363,11 @@ def register(app):
         from . import jobs
         return render(c, "scope.html", nav="scope", d=services.scope_page(c), q=jobs.queue_info(c), f=flash(request))
 
+    @app.get("/scope/live", response_class=HTMLResponse, include_in_schema=False)
+    def scope_live(c: Ctx = Depends(get_ctx)):
+        """The domains card's live part only (polled by the Scope page while it waits on the scanner)."""
+        return render(c, "partials/scope_domains_live.html", d=services.scope_page(c))
+
     @app.post("/scope/entries", include_in_schema=False)
     def scope_entry(kind: str = Form(""), value: str = Form(""), action: str = Form("add"), c: Ctx = Depends(get_ctx)):
         if kind not in ("exclusion", "range", "host") or action not in ("add", "remove"):

@@ -186,6 +186,18 @@ def test_live_polling_does_not_keep_a_session_alive(admin, settings):
     assert admin.get("/runs/live", headers={"HX-Request": "true"}).status_code == 401    # and it still expires
 
 
+def test_scope_polling_does_not_keep_a_session_alive(admin, settings):
+    """The Scope page's live part polls while a domain waits for its record, which can be indefinitely."""
+    _age_sessions(settings, minutes=10)
+    conn = dbm.connect(settings.db_path)
+    before = conn.execute("SELECT last_seen_at FROM sessions").fetchone()[0]
+    assert admin.get("/scope/live", headers={"HX-Request": "true"}).status_code == 200
+    assert conn.execute("SELECT last_seen_at FROM sessions").fetchone()[0] == before
+    conn.close()
+    _age_sessions(settings, minutes=settings.session_idle_minutes + 1)
+    assert admin.get("/scope/live", headers={"HX-Request": "true"}).status_code == 401
+
+
 def test_secure_mode_cookie_flags(tmp_path):
     from conftest import make_settings
     from app.web import create_app
