@@ -1,7 +1,7 @@
 <section class="card">
 <h2>Queue a job</h2>
 <p class="note">What leaves this machine during a scan, and to whom: <a href="/docs/data-flows">data flows</a>.</p>
-{% if q.busy %}<p class="flash err" role="status">A job is already queued or running ({{ q.busy }}). Wait for it to finish before adding another. The scanner runs one job at a time.</p>{% endif %}
+{% if q.busy %}<p class="flash info" role="status">A job is in progress (<code>{{ q.busy }}</code>). You can queue another when it finishes: the scanner runs one job at a time.</p>{% endif %}
 {% if q.why %}<p class="note">{{ q.why }}</p>{% endif %}
 {% if q.forms %}<ul class="queue-list">
 {% for fm in q.forms %}

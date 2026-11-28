@@ -169,7 +169,9 @@ def test_one_job_at_a_time(admin, settings):
     loc = queue(admin, "inventory")
     assert "err=" in loc and "in flight" in said(loc)
     page = admin.get("/runs").text
-    assert "A job is already queued or running" in page and sync[:-5] in page
+    assert "A job is in progress" in page and sync[:-5] in page
+    # a job in progress is a status, not an error: the red line is only for a click that was refused
+    assert 'class="flash info"' in page and "flash err" not in page
     finish(settings, sync[:-5], "running", "scope-sync")
     assert "err=" in queue(admin, "inventory")
     finish(settings, sync[:-5], "done", "scope-sync")
