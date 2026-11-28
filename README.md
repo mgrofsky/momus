@@ -30,7 +30,7 @@ What the optional AI analyst is given, what it can produce, and what a person ha
 
 Momus is for a security engineer or a small team that wants a self-hosted scanner for its own domains, with a record of what was scanned, when, and on whose approval.
 
-License: [MIT](LICENSE). Source: <https://github.com/mgrofsky/momus>.
+License: [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). Copyright (C) 2026 Matt Grofsky. If you run a modified version as a network service, the license requires you to offer its users the modified source. Version 0.1.0 was released under the MIT License and stays under it. Source: <https://github.com/mgrofsky/momus>.
 
 ## Quick start: the lab demo
 
@@ -106,6 +106,7 @@ Then, in this order:
 - [Updating the base image](docs/base-image.md).
 - Reference: [job file format](docs/reference/job-format.md), [published folder](docs/reference/published-layout.md), [version-watch output](docs/reference/version-watch-schema.md), [HTTP API](docs/reference/http-api.md).
 - Cloud examples: [AWS](deploy/aws/README.md) and [Google Cloud](deploy/gcp/README.md).
+- [Roadmap](docs/roadmap.md): what is planned next, and the decisions still open.
 - [Third-party tools and licenses](THIRD-PARTY-TOOLS.md), [security policy](SECURITY.md), [contributing](CONTRIBUTING.md), [code of conduct](CODE_OF_CONDUCT.md), and [changelog](CHANGELOG.md).
 
 ## Limits you should know

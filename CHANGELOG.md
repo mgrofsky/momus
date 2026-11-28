@@ -14,6 +14,8 @@ All notable changes to this project are recorded in this file. The format follow
 
 ### Changed
 
+- **License:** Momus is now licensed under the GNU Affero General Public License v3.0 (AGPL-3.0-only). Version 0.1.0 was released under the MIT License and stays under it.
+- The Runs page shows a job in progress as a neutral status line, not in the red error style, so a click that worked no longer looks refused. The red line is kept for a click that was turned down.
 - Refreshed the web interface's typography, spacing, colors, and responsive layouts, including the Overview, Runs, Analyst, and Settings pages.
 - Pinned the scanner image's baked nuclei templates to a SHA-256-verified release archive, avoiding the updater's rate-limited build step.
 
